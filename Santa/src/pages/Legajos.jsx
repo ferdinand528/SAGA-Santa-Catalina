@@ -1,79 +1,125 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UserPlus, Search, ChevronRight, X, Heart } from 'lucide-react';
+import { 
+  Search, UserPlus, Edit, Trash2, Eye, 
+  User, CreditCard, Landmark, Loader2, ArrowLeft 
+} from 'lucide-react';
 
-const Alumnos = () => {
-  const navigate = useNavigate();
+const Legajos = () => {
   const [alumnos, setAlumnos] = useState([]);
-  const [perfil, setPerfil] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
-    async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: p } = await supabase.from('perfiles').select('rol').eq('id', user.id).single();
-      setPerfil(p);
-      const { data: alu } = await supabase.from('alumnos').select('*, datos_medicos(diagnostico)').order('apellido');
-      setAlumnos(alu || []);
-      setLoading(false);
-    }
-    init();
+    fetchAlumnos();
   }, []);
 
-  const alumnosFiltrados = alumnos.filter(a => {
-    const t = busqueda.toLowerCase();
-    return a.nombre.toLowerCase().includes(t) || a.apellido.toLowerCase().includes(t) || a.dni.includes(t);
-  });
+  async function fetchAlumnos() {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('alumnos')
+        .select('*')
+        .order('apellido', { ascending: true });
 
-  if (loading) return <div className="h-screen flex items-center justify-center font-black text-blue-600 animate-pulse">CARGANDO...</div>;
+      if (error) throw error;
+      setAlumnos(data || []);
+    } catch (error) {
+      console.error("Error:", error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const eliminarAlumno = async (id, nombre) => {
+    if (window.confirm(`¿Seguro que desea dar de baja a ${nombre}?`)) {
+      await supabase.from('alumnos').delete().eq('id', id);
+      fetchAlumnos();
+    }
+  };
+
+  const filtrados = alumnos.filter(a => 
+    `${a.apellido} ${a.nombre} ${a.dni}`.toLowerCase().includes(busqueda.toLowerCase())
+  );
+
+  if (loading) return (
+    <div className="h-screen flex items-center justify-center text-[#84bd00] font-black uppercase tracking-widest">
+      <Loader2 className="animate-spin mr-2" /> Cargando Nómina...
+    </div>
+  );
 
   return (
-    <div className="min-h-screen p-6 md:p-10">
-      <div className="max-w-6xl mx-auto">
-        <header className="flex flex-col md:flex-row justify-between items-center gap-6 mb-10 bg-white/90 backdrop-blur-sm p-8 rounded-[2.5rem] border border-blue-50 shadow-sm">
-          <div className="w-full md:w-auto">
-            <button onClick={() => navigate('/dashboard')} className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-2 mb-2"><ArrowLeft size={14}/> Volver</button>
-            <h1 className="text-3xl font-black text-blue-900 uppercase tracking-tighter">Alumnos</h1>
+    <div className="min-h-screen p-6 md:p-10 bg-transparent animate-fade-in">
+      <div className="max-w-7xl mx-auto">
+        
+        {/* BOTÓN VOLVER Y HEADER */}
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+          <div>
+            {/* BOTÓN DE RETORNO AL DASHBOARD */}
+            <button 
+              onClick={() => navigate('/dashboard')} 
+              className="flex items-center gap-2 text-gray-400 font-black uppercase text-[10px] mb-4 hover:text-[#84bd00] transition-colors group"
+            >
+              <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> 
+              Volver al Panel Principal
+            </button>
+            
+            <h1 className="text-4xl font-black text-gray-800 tracking-tighter">Nómina de Alumnos</h1>
+            <p className="text-[10px] font-black text-[#84bd00] uppercase tracking-[0.3em] mt-1">
+              S.A.G.A ver 1.1 • Gestión de Legajos
+            </p>
           </div>
-          <div className="relative w-full md:w-96">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400" size={18} />
-            <input type="text" placeholder="Buscar por nombre o DNI..." className="w-full pl-12 pr-4 py-4 bg-gray-50/50 rounded-2xl outline-none border border-gray-100 font-bold" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-          </div>
+          
+          <button 
+            onClick={() => navigate('/alta-alumno')} 
+            className="bg-[#84bd00] text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-green-100 flex items-center gap-2 hover:bg-[#6a9600] transition-all"
+          >
+            <UserPlus size={18}/> Nuevo Ingreso
+          </button>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {alumnosFiltrados.map(a => (
-            <div key={a.id} onClick={() => navigate(`/legajo/${a.id}`)} className="bg-white/80 backdrop-blur-sm p-6 rounded-[2rem] border border-gray-100 hover:shadow-xl cursor-pointer transition-all">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="font-black text-blue-900 uppercase">{a.apellido}, {a.nombre}</h3>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">DNI: {a.dni}</p>
+        {/* CONTENEDOR DE LISTADO */}
+        <div className="bg-white/80 backdrop-blur-xl rounded-4xl shadow-sm border border-white/50 p-8">
+          <div className="relative mb-8">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={22} />
+            <input 
+              type="text" 
+              placeholder="Buscar por DNI o Apellido..." 
+              className="w-full pl-14 pr-6 py-5 bg-gray-50/50 rounded-2xl outline-none font-bold text-sm focus:ring-4 focus:ring-[#84bd00]/10 transition-all"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-4">
+            {filtrados.map(a => (
+              <div key={a.id} className="flex flex-col md:flex-row justify-between items-center p-6 bg-white/40 border border-gray-100 rounded-[2rem] hover:border-[#84bd00]/30 transition-all">
+                <div className="flex items-center gap-5 mb-4 md:mb-0">
+                  <div className="bg-green-50 p-4 rounded-2xl text-[#84bd00]">
+                    <User size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight">{a.apellido}, {a.nombre}</h3>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                      DNI: {a.dni} • {a.obra_social || 'PARTICULAR'}
+                    </p>
+                  </div>
                 </div>
-                <div className="bg-blue-50 text-blue-600 p-2 rounded-xl"><ChevronRight size={16}/></div>
+
+                <div className="flex items-center gap-2">
+                  <button onClick={() => navigate(`/legajo/${a.id}`)} className="p-4 bg-gray-50 text-gray-400 rounded-2xl hover:bg-[#84bd00] hover:text-white transition-all"><Eye size={20}/></button>
+                  <button onClick={() => navigate(`/editar-alumno/${a.id}`)} className="p-4 bg-gray-50 text-gray-400 rounded-2xl hover:bg-gray-800 hover:text-white transition-all"><Edit size={20}/></button>
+                  <button onClick={() => eliminarAlumno(a.id, `${a.nombre} ${a.apellido}`)} className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-600 hover:text-white transition-all"><Trash2 size={20}/></button>
+                </div>
               </div>
-              
-              {/* VISTA SEGÚN ROL */}
-              {perfil?.rol === 'director' ? (
-                <div className="bg-green-50/50 p-3 rounded-xl flex justify-between items-center">
-                  <span className="text-[9px] font-black text-green-600 uppercase">Cuota</span>
-                  <span className="font-black text-green-900">${a.cuota_monto_mensual}</span>
-                </div>
-              ) : (
-                <div className="bg-red-50/50 p-3 rounded-xl flex items-center gap-2">
-                  <Heart size={12} className="text-red-500" />
-                  <span className="text-[9px] font-black text-red-700 uppercase truncate">
-                    {a.datos_medicos?.[0]?.diagnostico || "Sin diagnóstico cargado"}
-                  </span>
-                </div>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-export default Alumnos;
+export default Legajos;

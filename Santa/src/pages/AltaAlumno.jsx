@@ -1,124 +1,78 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, User, Search } from 'lucide-react';
+import { ArrowLeft, UserPlus, Save } from 'lucide-react';
 
-// Lista predefinida de las obras sociales más comunes en Argentina
-const OBRAS_SOCIALES_ARG = [
-  "IOMA", "PAMI", "OSDE", "Swiss Medical", "Galeno", "Medicus", 
-  "Omint", "Sancor Salud", "OSECAC", "OSDEPYM", "OSPEDYC", 
-  "Unión Personal", "Accord Salud", "IAPOS", "IOSCOR", 
-  "Incluir Salud", "Obra Social Ferroviaria", "Particular/Ninguna"
-].sort();
+const OBRAS_SOCIALES = [
+  "PARTICULAR", "PAMI", "IOSCOR", "INCLUIR SALUD", 
+  "OSDE", "SWISS MEDICAL", "GALENO", "OSECAC", "IOSFA", "OSPRERA", 
+  "OSPEDYC", "SANCOR SALUD", "MEDIFE", "UNION PERSONAL", "ISSUNNE", "POLICIA FEDERAL", 
+  "OSACRA", "SPS", "OTRA"
+];
 
 const AltaAlumno = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
-    nombre: '',
-    apellido: '',
-    dni: '',
-    fecha_nacimiento: '',
-    obra_social: ''
+    apellido: '', nombre: '', dni: '', fecha_nacimiento: '',
+    obra_social: 'PARTICULAR', nro_afiliado: '', cuota_monto_mensual: ''
   });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
-    const { error } = await supabase
-      .from('alumnos')
-      .insert([form]);
-
+    const { error } = await supabase.from('alumnos').insert([form]);
     if (error) {
-      alert("Error al guardar: " + error.message);
+      alert("Error: " + error.message);
     } else {
-      alert("¡Alumno registrado con éxito!");
-      navigate('/legajos'); 
+      alert("Alumno registrado con éxito");
+      navigate('/legajos');
     }
     setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-2xl mx-auto">
-        <button 
-          onClick={() => navigate('/legajos')} 
-          className="flex items-center gap-2 text-gray-600 hover:text-blue-600 mb-6 transition"
-        >
-          <ArrowLeft size={20} /> Volver a Legajos
+    <div className="min-h-screen p-6 md:p-10 bg-transparent animate-fade-in">
+      <div className="max-w-4xl mx-auto">
+        <button onClick={() => navigate('/legajos')} className="flex items-center gap-2 text-gray-400 font-black uppercase text-[10px] mb-8 hover:text-blue-600 transition">
+          <ArrowLeft size={16} /> Volver a Nómina
         </button>
 
-        <div className="bg-white rounded-2xl shadow-xl border border-blue-100 overflow-hidden">
-          <div className="bg-blue-600 p-6 text-white flex items-center gap-4">
-            <User size={30} />
+        <form onSubmit={handleSubmit} className="bg-white/90 backdrop-blur-xl rounded-[3rem] shadow-2xl border border-white/50 overflow-hidden">
+          <div className="bg-blue-600 p-8 text-white flex items-center gap-4">
+            <div className="bg-white/20 p-3 rounded-2xl"><UserPlus size={32} /></div>
             <div>
-              <h2 className="text-2xl font-bold">Nuevo Legajo</h2>
-              <p className="text-blue-100 opacity-80">Complete los datos básicos del alumno</p>
+              <h2 className="text-2xl font-black uppercase tracking-tighter">Nuevo Legajo</h2>
+              <p className="text-blue-100 text-[10px] font-bold uppercase tracking-widest mt-1">S.A.G.A ver 1.0 • Registro Inicial</p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-8 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre</label>
-                <input 
-                  type="text" required className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                  onChange={e => setForm({...form, nombre: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Apellido</label>
-                <input 
-                  type="text" required className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                  onChange={e => setForm({...form, apellido: e.target.value})}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">DNI</label>
-              <input 
-                type="text" required className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                onChange={e => setForm({...form, dni: e.target.value})}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Fecha de Nacimiento</label>
-              <input 
-                type="date" required className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                onChange={e => setForm({...form, fecha_nacimiento: e.target.value})}
-              />
-            </div>
-
-            {/* SECCIÓN MODIFICADA: LISTA DESPLEGABLE */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Obra Social</label>
+          <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <input required placeholder="Apellido" className="p-4 bg-gray-50 rounded-2xl outline-none font-bold text-sm" onChange={e => setForm({...form, apellido: e.target.value})} />
+            <input required placeholder="Nombre" className="p-4 bg-gray-50 rounded-2xl outline-none font-bold text-sm" onChange={e => setForm({...form, nombre: e.target.value})} />
+            <input required placeholder="DNI (Sin puntos)" className="p-4 bg-gray-50 rounded-2xl outline-none font-bold text-sm" onChange={e => setForm({...form, dni: e.target.value})} />
+            <input type="date" className="p-4 bg-gray-50 rounded-2xl outline-none font-bold text-sm text-gray-400" onChange={e => setForm({...form, fecha_nacimiento: e.target.value})} />
+            
+            {/* SELECT DE OBRA SOCIAL */}
+            <div className="space-y-1">
+              <label className="text-[9px] font-black text-gray-400 uppercase ml-2">Obra Social</label>
               <select 
-                required 
-                className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                required
+                className="w-full p-4 bg-gray-50 rounded-2xl outline-none font-bold text-sm text-blue-900 border-none appearance-none"
                 value={form.obra_social}
                 onChange={e => setForm({...form, obra_social: e.target.value})}
               >
-                <option value="">Seleccione una obra social...</option>
-                {OBRAS_SOCIALES_ARG.map((os) => (
-                  <option key={os} value={os}>{os}</option>
-                ))}
-                <option value="Otra">Otra (No figura en la lista)</option>
+                {OBRAS_SOCIALES.map(os => <option key={os} value={os}>{os}</option>)}
               </select>
             </div>
 
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full bg-blue-600 text-white p-4 rounded-xl font-bold text-lg hover:bg-blue-700 shadow-lg transition-all flex items-center justify-center gap-2"
-            >
-              <Save size={22} />
-              {loading ? "Guardando..." : "Registrar Alumno"}
+            <input type="number" placeholder="Monto Cuota Mensual $" className="p-4 bg-gray-50 rounded-2xl outline-none font-bold text-sm" onChange={e => setForm({...form, cuota_monto_mensual: e.target.value})} />
+            
+            <button disabled={loading} className="md:col-span-2 bg-blue-600 text-white p-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition flex items-center justify-center gap-3 mt-4">
+              <Save size={20}/> {loading ? "GUARDANDO..." : "CREAR ALUMNO"}
             </button>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </div>
   );

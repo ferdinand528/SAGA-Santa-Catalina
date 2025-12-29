@@ -1,46 +1,68 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
-// IMPORTACIÓN DE PÁGINAS
+// --- IMPORTACIÓN DE PÁGINAS ---
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import Alumnos from './pages/Legajos'; 
+
+// Módulo de Alumnos (Legajos)
+import Legajos from './pages/Legajos'; 
 import FichaAlumno from './pages/FichaAlumno';
-import RegistroPago from './pages/RegistroPago'; 
+import EditarAlumno from './pages/EditarAlumno';
+import AltaAlumno from './pages/AltaAlumno';
+
+// Módulo de Personal y Profesionales
 import ListaPersonal from './pages/ListaPersonal';
-import RegistroProfesional from './pages/RegistroProfesional';
-import Calendario from './pages/Calendario';
+import RegistroProfesional from './pages/RegistroProfesional'; // Sincronizado con tu archivo
+import EditarPersonal from './pages/EditarPersonal';
+
+// Módulo de Administración y Pagos
+import RegistroPago from './pages/RegistroPago';
 import Estadisticas from './pages/Estadisticas';
+
+// Otros Módulos
+import Calendario from './pages/Calendario';
 
 function App() {
   return (
     <Router>
-      {/* EL SECRETO: El contenedor principal tiene bg-transparent 
-      */}
-      <div className="relative min-h-screen bg-transparent">
+      {/* CONTENEDOR PRINCIPAL: bg-transparent para ver el logo de fondo */}
+      <div className="relative min-h-screen bg-transparent font-sans overflow-x-hidden">
         
-        {/* LOGO DE FONDO (MARCA DE AGUA) */}
+        {/* LOGO INSTITUCIONAL (MARCA DE AGUA) */}
+        {/* Este div queda fijo detrás de todas las páginas */}
         <div className="fixed inset-0 flex items-center justify-center pointer-events-none -z-10">
           <img 
             src="/logo-instituto.jpeg" 
-            alt="Fondo Santa Catalina" 
-            className="w-[500px] md:w-[800px] opacity-[0.08] grayscale select-none" 
-            /* Subimos la opacidad a 0.08 para que sea más visible */
+            alt="Logo Santa Catalina" 
+            className="w-[500px] md:w-[850px] opacity-[0.06] grayscale select-none" 
           />
         </div>
 
-        {/* CONTENIDO CON Z-INDEX POSITIVO */}
+        {/* ENRUTADOR DE SECCIONES: Z-index positivo para quedar sobre el logo */}
         <div className="relative z-10">
           <Routes>
+            {/* 1. ACCESO CENTRAL */}
             <Route path="/" element={<Login />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/legajos" element={<Alumnos />} />
+
+            {/* 2. GESTIÓN DE ALUMNOS (ABM completo) */}
+            <Route path="/legajos" element={<Legajos />} />
             <Route path="/legajo/:id" element={<FichaAlumno />} />
+            <Route path="/alta-alumno" element={<AltaAlumno />} />
+            <Route path="/editar-alumno/:id" element={<EditarAlumno />} />
+
+            {/* 3. GESTIÓN DE PAGOS Y CAJA */}
             <Route path="/registro-pago" element={<RegistroPago />} />
+            <Route path="/estadisticas" element={<Estadisticas />} />
+
+            {/* 4. GESTIÓN DE PERSONAL Y RRHH */}
             <Route path="/personal" element={<ListaPersonal />} />
             <Route path="/registro-personal" element={<RegistroProfesional />} />
+            <Route path="/editar-personal/:id" element={<EditarPersonal />} />
+
+            {/* 5. AGENDA Y CALENDARIO */}
             <Route path="/calendario" element={<Calendario />} />
-            <Route path="/estadisticas" element={<Estadisticas />} />
           </Routes>
         </div>
       </div>
