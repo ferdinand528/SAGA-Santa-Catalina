@@ -10,11 +10,13 @@ import Legajos from './pages/Legajos';
 import FichaAlumno from './pages/FichaAlumno';
 import EditarAlumno from './pages/EditarAlumno';
 import AltaAlumno from './pages/AltaAlumno';
+import Evoluciones from './pages/Evoluciones';
 
 // Módulo de Personal y Profesionales
 import ListaPersonal from './pages/ListaPersonal';
-import RegistroProfesional from './pages/RegistroProfesional'; // Sincronizado con tu archivo
+import RegistroProfesional from './pages/RegistroProfesional'; 
 import EditarPersonal from './pages/EditarPersonal';
+import MiPerfil from './pages/MiPerfil'; // <--- NUEVA IMPORTACIÓN
 
 // Módulo de Administración y Pagos
 import RegistroPago from './pages/RegistroPago';
@@ -30,7 +32,6 @@ function App() {
       <div className="relative min-h-screen bg-transparent font-sans overflow-x-hidden">
         
         {/* LOGO INSTITUCIONAL (MARCA DE AGUA) */}
-        {/* Este div queda fijo detrás de todas las páginas */}
         <div className="fixed inset-0 flex items-center justify-center pointer-events-none -z-10">
           <img 
             src="/logo-instituto.jpeg" 
@@ -51,6 +52,7 @@ function App() {
             <Route path="/legajo/:id" element={<FichaAlumno />} />
             <Route path="/alta-alumno" element={<AltaAlumno />} />
             <Route path="/editar-alumno/:id" element={<EditarAlumno />} />
+            <Route path="/evoluciones" element={<Evoluciones />} />
 
             {/* 3. GESTIÓN DE PAGOS Y CAJA */}
             <Route path="/registro-pago" element={<RegistroPago />} />
@@ -60,6 +62,7 @@ function App() {
             <Route path="/personal" element={<ListaPersonal />} />
             <Route path="/registro-personal" element={<RegistroProfesional />} />
             <Route path="/editar-personal/:id" element={<EditarPersonal />} />
+            <Route path="/mi-perfil" element={<MiPerfil />} /> {/* <--- NUEVA RUTA */}
 
             {/* 5. AGENDA Y CALENDARIO */}
             <Route path="/calendario" element={<Calendario />} />
