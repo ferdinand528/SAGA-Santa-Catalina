@@ -1,0 +1,30 @@
+name: CI - Auditoría S.A.G.A v1.8
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias
+        run: |
+          cd Santa
+          npm install
+
+      - name: Ejecutar Tests Automáticos
+        run: |
+          cd Santa
+          npm test -- --run
