@@ -11,6 +11,7 @@ import FichaAlumno from './pages/FichaAlumno';
 import EditarAlumno from './pages/EditarAlumno';
 import AltaAlumno from './pages/AltaAlumno';
 import Evoluciones from './pages/Evoluciones';
+import FichaEmergencia from './components/FichaEmergencia'; // <--- NUEVA IMPORTACIÓN v2.0
 
 // 2. Módulo de Personal y RRHH
 import ListaPersonal from './pages/ListaPersonal';
@@ -21,13 +22,13 @@ import MiPerfil from './pages/MiPerfil';
 // 3. Módulo de Administración y Cobranzas
 import ListaCobranzas from './pages/ListaCobranzas';
 import RegistroPagoAlumno from './pages/RegistroPagoAlumno';
-import Estadisticas from './pages/Estadisticas'; // Balance Financiero v1.8
+import Estadisticas from './pages/Estadisticas'; 
 
 // 4. Hub de Reportes Institucionales y Auditoría
 import ReportesMenu from './pages/ReportesMenu';
 import ReporteDocumentacion from './pages/ReporteDocumentacion';
 import ResumenCajaDiaria from './pages/ResumenCajaDiaria'; 
-import ReporteObraSocial from './pages/ReporteObraSocial'; // <--- NUEVO REPORTE v1.8
+import ReporteObraSocial from './pages/ReporteObraSocial'; 
 
 // 5. Otros Módulos
 import Calendario from './pages/Calendario';
@@ -35,7 +36,6 @@ import Calendario from './pages/Calendario';
 function App() {
   return (
     <Router>
-      {/* CONTENEDOR PRINCIPAL: bg-transparent para ver el logo de fondo */}
       <div className="relative min-h-screen bg-transparent font-sans overflow-x-hidden">
         
         {/* LOGO INSTITUCIONAL (MARCA DE AGUA) */}
@@ -54,18 +54,20 @@ function App() {
             <Route path="/" element={<Login />} />
             <Route path="/dashboard" element={<Dashboard />} />
 
-            {/* GESTIÓN DE ALUMNOS */}
+            {/* GESTIÓN DE ALUMNOS v2.0 */}
             <Route path="/legajos" element={<Legajos />} />
             <Route path="/legajo/:id" element={<FichaAlumno />} />
             <Route path="/alta-alumno" element={<AltaAlumno />} />
             <Route path="/editar-alumno/:id" element={<EditarAlumno />} />
             <Route path="/evoluciones" element={<Evoluciones />} />
+            {/* RUTA PARA IMPRESIÓN DE FICHA MÉDICA */}
+            <Route path="/alumno/:id/ficha-medica" element={<FichaEmergencia />} />
 
             {/* COBRANZAS Y FINANZAS */}
             <Route path="/cobranzas" element={<ListaCobranzas />} />
             <Route path="/registrar-pago/:alumnoId" element={<RegistroPagoAlumno />} />
 
-            {/* HUB DE REPORTES Y AUDITORÍA v1.8 */}
+            {/* HUB DE REPORTES Y AUDITORÍA */}
             <Route path="/reportes" element={<ReportesMenu />} />
             <Route path="/reporte-documentacion" element={<ReporteDocumentacion />} />
             <Route path="/reporte-caja-diaria" element={<ResumenCajaDiaria />} />

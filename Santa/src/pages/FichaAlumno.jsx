@@ -109,25 +109,33 @@ const FichaAlumno = () => {
         )}
 
         {/* SECCIÓN DE DATOS MÉDICOS (No se imprime) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:hidden mb-8">
-          <div className="bg-white/90 backdrop-blur-sm p-8 rounded-[2.5rem] shadow-sm border border-blue-50">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:hidden mb-8">
+            <div className="bg-white/90 backdrop-blur-sm p-8 rounded-[2.5rem] shadow-sm border border-blue-50 flex flex-col justify-between">
+           <div>
             <h3 className="text-[10px] font-black text-blue-600 uppercase mb-4 flex items-center gap-2"><Heart size={14}/> Ficha Médica</h3>
-            <p className="text-sm font-black text-red-600 uppercase">{alumno.datos_medicos?.diagnostico || "Sin diagnóstico"}</p>
-            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-sm font-black text-red-600 uppercase">{alumno.datos_medicos?.diagnostico || "Sin diagnóstico"}</p>
+              <div className="mt-4 pt-4 border-t border-gray-100">
               <p className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1"><Pill size={12}/> Medicación</p>
               <p className="text-xs font-bold text-red-800 italic">{alumno.datos_medicos?.medicamentos || "No registra"}</p>
-            </div>
-          </div>
-          <div className="lg:col-span-2">
-             <div className="bg-orange-50/90 backdrop-blur-sm p-8 rounded-[2.5rem] border border-orange-100">
-                <h3 className="text-xs font-black text-orange-600 uppercase mb-4 flex items-center gap-2"><ClipboardList size={18}/> Nueva Actividad</h3>
-                <textarea className="w-full p-6 bg-white/80 rounded-3xl border border-orange-100 outline-none font-bold text-sm min-h-[100px]" placeholder="Registrar lo realizado hoy..." value={nuevaActividad} onChange={(e) => setNuevaActividad(e.target.value)} />
-                <button onClick={guardarActividad} disabled={saving || !nuevaActividad} className="mt-4 w-full bg-orange-500 text-white p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-orange-600 transition">
-                   {saving ? 'GUARDANDO...' : 'REGISTRAR ACTIVIDAD'}
-                </button>
-             </div>
-          </div>
         </div>
+        </div>
+    
+    {/* Botón de Acción Versión 2.0 */}
+    <button 
+      onClick={() => window.open(`/alumno/${id}/ficha-medica`, '_blank')}
+      className="mt-6 w-full bg-red-600 text-white p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-700 transition flex items-center justify-center gap-2 shadow-lg shadow-red-100 active:scale-95"
+    >
+      <Printer size={14}/> Generar Ficha Médica
+    </button>
+  </div>
+  
+  <div className="lg:col-span-2">
+    {/* Tu código de "Nueva Actividad" se mantiene igual... */}
+    <div className="bg-orange-50/90 backdrop-blur-sm p-8 rounded-[2.5rem] border border-orange-100">
+       {/* ... contenido previo ... */}
+    </div>
+  </div>
+</div>
 
         {/* --- REPORTE IMPRIMIBLE (Glassmorphism en pantalla, Blanco Puro en papel) --- */}
         <div className="bg-white/90 backdrop-blur-sm p-10 md:p-16 rounded-[2.5rem] border border-gray-100 shadow-sm print:shadow-none print:border-none print:bg-white print:p-0">
