@@ -1,162 +1,229 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, Save, UserCircle, Phone, Calendar, 
-  Lock, Loader2, FileText, Upload, CheckCircle 
+  User, Mail, Briefcase, Shield, Save, FileText, 
+  ArrowLeft, MapPin, IdCard, Phone, Upload, CheckCircle, Lock 
 } from 'lucide-react';
 
 const MiPerfil = () => {
+  const { id } = useParams();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  
-  const [form, setForm] = useState({
-    nombre_completo: '', celular: '', fecha_nacimiento: '',
-    url_dni: '', url_cv: '', url_buena_conducta: '', 
-    url_afip: '', url_titulo: '', url_cuil: ''
+  const [currentUser, setCurrentUser] = useState(null);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [targetPerfil, setTargetPerfil] = useState({
+    nombre_completo: '', profesion: '', rol: '', email: '', 
+    dni: '', cuit: '', domicilio: '', celular: '',
+    url_dni_frente: '', url_dni_dorso: '', url_cv: '', url_titulo: '', 
+    url_seguro: '', url_matricula: '', url_cbu: ''
   });
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(null);
+
+  const cargosRaw = [
+    "Psicopedagogía", "Fonoaudiología", "Kinesiología", "Estimulación del Lenguaje",
+    "Estimulación Visual", "Maestra Integradora", "Docente Orientadora de Sala", 
+    "Auxiliar de Sala", "Medico Clinico", "Terapia Ocupacional", "Docente de Apoyo", 
+    "Psicología", "Psicomotricidad", "Trabajo Social", "Nutrición", "Administración"
+  ];
+  const listaCargos = [...cargosRaw].sort((a, b) => a.localeCompare('es'));
+
+  const esDirector = currentUser?.rol === 'director' || currentUser?.rol === 'administrador';
+  const esPropioPerfil = !id || id === currentUser?.id;
 
   useEffect(() => {
-    cargarDatos();
-  }, []);
+    async function loadData() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { navigate('/'); return; }
+        const { data: currentP } = await supabase.from('perfiles').select('*').eq('id', user.id).single();
+        setCurrentUser(currentP);
 
-  async function cargarDatos() {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data } = await supabase.from('perfiles').select('*').eq('id', user.id).single();
-      if (data) setForm(data);
-    } catch (err) { console.error(err); } finally { setLoading(false); }
-  }
+        const targetId = id || user.id;
+        const { data: targetP } = await supabase.from('perfiles').select('*').eq('id', targetId).single();
+        if (targetP) setTargetPerfil(targetP);
+      } catch (error) { console.error(error); } 
+      finally { setLoading(false); }
+    }
+    loadData();
+  }, [id, navigate]);
 
-  // FUNCIÓN PARA SUBIR ARCHIVOS A STORAGE
   const handleFileUpload = async (e, campo) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    setUpdating(true);
+    setUploading(campo);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${campo}_${Math.random()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      // Subir al bucket 'documentos_personal'
-      const { error: uploadError } = await supabase.storage
-        .from('documentos_personal')
-        .upload(filePath, file);
-
+      const filePath = `${targetPerfil.id}/${campo}_${Math.random()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('legajos_profesionales').upload(filePath, file);
       if (uploadError) throw uploadError;
 
-      // Obtener URL pública
-      const { data: { publicUrl } } = supabase.storage
-        .from('documentos_personal')
-        .getPublicUrl(filePath);
-
-      setForm(prev => ({ ...prev, [campo]: publicUrl }));
-      alert("Documento cargado en memoria. No olvides Guardar Cambios al final.");
-    } catch (err) {
-      alert("Error al subir: " + err.message);
-    } finally {
-      setUpdating(false);
-    }
+      const { data: { publicUrl } } = supabase.storage.from('legajos_profesionales').getPublicUrl(filePath);
+      await supabase.from('perfiles').update({ [campo]: publicUrl }).eq('id', targetPerfil.id);
+      
+      setTargetPerfil({ ...targetPerfil, [campo]: publicUrl });
+      alert("Documento subido con éxito.");
+    } catch (error) { alert("Error al subir: " + error.message); } 
+    finally { setUploading(null); }
   };
 
-  const handleSave = async (e) => {
-    e.preventDefault();
-    if (password && password !== confirmPassword) return alert("Las claves no coinciden.");
+  const handleUpdate = async () => {
+    // Validación de contraseña antes de procesar
+    if (password && password !== confirmPassword) {
+      alert("Las contraseñas no coinciden. Por favor, verificalas.");
+      return;
+    }
 
-    setUpdating(true);
+    const updates = {
+      nombre_completo: targetPerfil.nombre_completo,
+      profesion: targetPerfil.profesion,
+      dni: targetPerfil.dni,
+      cuit: targetPerfil.cuit,
+      domicilio: targetPerfil.domicilio,
+      celular: targetPerfil.celular,
+      ...(esDirector && !esPropioPerfil && { rol: targetPerfil.rol })
+    };
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // Actualizar tabla perfiles
-      const { error } = await supabase.from('perfiles').update(form).eq('id', user.id);
+      const { error } = await supabase.from('perfiles').update(updates).eq('id', targetPerfil.id);
       if (error) throw error;
 
-      if (password) await supabase.auth.updateUser({ password });
-
-      alert("Legajo actualizado con éxito.");
-      navigate('/dashboard');
-    } catch (err) { alert(err.message); } finally { setUpdating(false); }
+      if (password && esPropioPerfil) {
+        const { error: authError } = await supabase.auth.updateUser({ password });
+        if (authError) throw authError;
+        setPassword('');
+        setConfirmPassword('');
+        alert("Perfil y contraseña actualizados correctamente.");
+      } else {
+        alert("Perfil actualizado correctamente.");
+      }
+    } catch (error) { alert("Error: " + error.message); }
   };
 
-  const InputFile = ({ label, campo, value }) => (
-    <div className="space-y-2 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-      <div className="flex justify-between items-center">
-        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{label}</label>
-        {value && <CheckCircle size={14} className="text-[#84bd00]" />}
-      </div>
-      <div className="relative">
-        <input 
-          type="file" 
-          accept=".pdf,image/*"
-          onChange={(e) => handleFileUpload(e, campo)}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        />
-        <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-dashed border-gray-300 text-gray-500">
-          <Upload size={16} />
-          <span className="text-[10px] font-bold uppercase">
-            {value ? "Archivo cargado (Click para cambiar)" : "Subir PDF o Imagen"}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (loading) return <div className="h-screen flex items-center justify-center font-black text-[#84bd00] uppercase text-xs">Cargando legajo...</div>;
+  if (loading) return <div className="h-screen flex items-center justify-center font-black text-[#84bd00] animate-pulse">Sincronizando Legajo...</div>;
 
   return (
-    <div className="min-h-screen p-6 md:p-10 bg-[#fcfaf7] animate-fade-in">
+    <div className="min-h-screen p-6 md:p-10 bg-transparent font-sans text-gray-800 animate-fade-in">
       <div className="max-w-5xl mx-auto">
-        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-gray-400 font-black uppercase text-[10px] mb-8 hover:text-gray-800 transition">
-          <ArrowLeft size={16} /> Volver al Panel
-        </button>
+        
+        <header className="mb-8">
+          <button onClick={() => navigate(esPropioPerfil ? '/dashboard' : '/personal')} className="flex items-center gap-2 text-gray-500 font-black uppercase text-[10px] hover:text-[#84bd00] transition bg-white/50 px-4 py-2 rounded-full shadow-sm">
+            <ArrowLeft size={18} /> Volver
+          </button>
+        </header>
 
-        <form onSubmit={handleSave} className="bg-white/90 backdrop-blur-xl rounded-4xl shadow-2xl border border-white/50 overflow-hidden">
-          <div className="bg-gray-800 p-10 text-white flex items-center gap-6">
-            <UserCircle size={48} />
+        <div className="bg-white rounded-[3rem] shadow-xl overflow-hidden border border-gray-100">
+          {/* HEADER TARJETA */}
+          <div className="bg-[#84bd00] p-10 text-white flex items-center gap-6">
+            <div className="bg-white/20 p-4 rounded-3xl"><User size={48}/></div>
             <div>
-              <h2 className="text-3xl font-black uppercase tracking-tighter">Mi Perfil</h2>
-              <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">S.A.G.A v1.5 • Documentación Digital</p>
+              <h1 className="text-3xl font-black uppercase tracking-tighter leading-none">{esPropioPerfil ? 'Mi Perfil' : 'Legajo Digital'}</h1>
+              <p className="text-green-100 text-[10px] font-bold uppercase mt-2">v2.0 • Instituto Santa Catalina</p>
             </div>
           </div>
 
-          <div className="p-10 space-y-10">
-            {/* DATOS PERSONALES */}
-            <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="md:col-span-2 border-b pb-2"><h3 className="text-[10px] font-black uppercase text-[#84bd00]">Datos Generales</h3></div>
-              <input placeholder="Nombre" className="p-4 bg-gray-50 rounded-xl font-bold text-sm" value={form.nombre_completo} onChange={e => setForm({...form, nombre_completo: e.target.value})} />
-              <input placeholder="Celular" className="p-4 bg-gray-50 rounded-xl font-bold text-sm" value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} />
-            </section>
+          <div className="p-10 space-y-12">
+            
+            {/* 1. IDENTIDAD Y CONTACTO */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-3"><h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b pb-2 flex items-center gap-2"><IdCard size={14}/> Identidad y Contacto</h3></div>
+              
+              <div><label className="text-[9px] font-black uppercase text-gray-500 ml-3 block mb-1">DNI</label>
+              <input className="w-full p-5 bg-gray-50 rounded-3xl border-none font-bold text-gray-700 shadow-inner" value={targetPerfil.dni || ''} onChange={(e) => setTargetPerfil({...targetPerfil, dni: e.target.value})} /></div>
+              
+              <div><label className="text-[9px] font-black uppercase text-gray-500 ml-3 block mb-1">CUIL / CUIT</label>
+              <input className="w-full p-5 bg-gray-50 rounded-3xl border-none font-bold text-gray-700 shadow-inner" value={targetPerfil.cuit || ''} onChange={(e) => setTargetPerfil({...targetPerfil, cuit: e.target.value})} /></div>
+              
+              <div><label className="text-[9px] font-black uppercase text-gray-500 ml-3 block mb-1">Celular</label>
+              <div className="relative"><input className="w-full p-5 pl-12 bg-gray-50 rounded-3xl border-none font-bold text-gray-700 shadow-inner" value={targetPerfil.celular || ''} onChange={(e) => setTargetPerfil({...targetPerfil, celular: e.target.value})} /><Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} /></div></div>
+              
+              <div className="md:col-span-2"><label className="text-[9px] font-black uppercase text-gray-500 ml-3 block mb-1">Domicilio Particular</label>
+              <input className="w-full p-5 bg-gray-50 rounded-3xl border-none font-bold text-gray-700 shadow-inner" value={targetPerfil.domicilio || ''} onChange={(e) => setTargetPerfil({...targetPerfil, domicilio: e.target.value})} /></div>
+              
+              <div><label className="text-[9px] font-black uppercase text-gray-500 ml-3 block mb-1">Cargo</label>
+              <select className="w-full p-5 bg-gray-50 rounded-3xl border-none font-bold text-gray-700 shadow-inner" value={targetPerfil.profesion || ''} onChange={(e) => setTargetPerfil({...targetPerfil, profesion: e.target.value})}>
+                <option value="">Seleccionar...</option>
+                {listaCargos.map(c => <option key={c} value={c}>{c}</option>)}
+              </select></div>
+            </div>
 
-            {/* SECCIÓN DE DOCUMENTOS (NUEVA) */}
-            <section>
-              <div className="border-b pb-2 mb-6"><h3 className="text-[10px] font-black uppercase text-[#84bd00]">Legajo Digital (PDF/Fotos)</h3></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <InputFile label="DNI (Frente/Dorso)" campo="url_dni" value={form.url_dni} />
-                <InputFile label="Curriculum Vitae" campo="url_cv" value={form.url_cv} />
-                <InputFile label="Buena Conducta" campo="url_buena_conducta" value={form.url_buena_conducta} />
-                <InputFile label="Constancia AFIP" campo="url_afip" value={form.url_afip} />
-                <InputFile label="Título Profesional" campo="url_titulo" value={form.url_titulo} />
-                <InputFile label="Constancia CUIL" campo="url_cuil" value={form.url_cuil} />
+            {/* 2. SEGURIDAD Y CLAVES (LA PARTE QUE FALTABA) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 border-t pt-10">
+              <div className="space-y-6">
+                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b pb-2 flex items-center gap-2"><Shield size={14}/> Acceso</h3>
+                <div>
+                  <label className="text-[9px] font-black uppercase text-gray-500 ml-3 block mb-1">Nombre Completo</label>
+                  <input className="w-full p-5 bg-gray-50 rounded-3xl border-none font-bold text-gray-700 shadow-inner" value={targetPerfil.nombre_completo || ''} onChange={(e) => setTargetPerfil({...targetPerfil, nombre_completo: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-[9px] font-black uppercase text-gray-500 ml-3 block mb-1">Rol de Sistema</label>
+                  <select disabled={!(esDirector && !esPropioPerfil)} className="w-full p-5 bg-gray-100 text-gray-500 rounded-3xl border-none font-black uppercase text-xs shadow-inner opacity-70" value={targetPerfil.rol || 'docente'} onChange={(e) => setTargetPerfil({...targetPerfil, rol: e.target.value})}>
+                    <option value="director">Director</option>
+                    <option value="docente">Docente / Profesional</option>
+                    <option value="administrador">Administrativo</option>
+                  </select>
+                </div>
               </div>
-            </section>
 
-            {/* SEGURIDAD */}
-            <section className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-green-50/30 rounded-3xl border border-green-100">
-              <input type="password" placeholder="Nueva Contraseña" className="p-4 bg-white rounded-xl font-bold text-sm" value={password} onChange={e => setPassword(e.target.value)} />
-              <input type="password" placeholder="Confirmar Contraseña" className="p-4 bg-white rounded-xl font-bold text-sm" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
-            </section>
+              {esPropioPerfil && (
+                <div className="space-y-6">
+                  <h3 className="text-[10px] font-black text-orange-600 uppercase tracking-widest border-b pb-2 flex items-center gap-2"><Lock size={14}/> Cambiar Contraseña</h3>
+                  <div className="bg-orange-50 p-6 rounded-[2.5rem] border border-orange-100 space-y-4 shadow-sm">
+                    <input type="password" placeholder="Nueva Contraseña" className="w-full p-4 rounded-2xl border-none shadow-inner text-sm font-bold" value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <input type="password" placeholder="Confirmar Contraseña" className="w-full p-4 rounded-2xl border-none shadow-inner text-sm font-bold" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                    <p className="text-[8px] font-bold text-orange-400 uppercase text-center">Debe coincidir para guardar</p>
+                  </div>
+                </div>
+              )}
+            </div>
 
-            <button disabled={updating} className="w-full bg-[#84bd00] text-white p-6 rounded-3xl font-black uppercase tracking-widest shadow-xl hover:bg-black transition-all flex items-center justify-center gap-3">
-              {updating ? <Loader2 className="animate-spin" /> : <Save size={20}/>}
-              {updating ? "PROCESANDO..." : "GUARDAR TODO EL LEGAJO"}
-            </button>
+            {/* 3. DOCUMENTACIÓN DIGITAL (LOS 7 REQUISITOS) */}
+            <div>
+              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b pb-4 mb-6 flex items-center gap-2"><FileText size={14}/> Archivos del Legajo</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                {[
+                  { id: 'url_dni_frente', label: 'DNI Frente' },
+                  { id: 'url_dni_dorso', label: 'DNI Dorso' },
+                  { id: 'url_cv', label: 'Curriculum Vitae' },
+                  { id: 'url_titulo', label: 'Título / Analítico' },
+                  { id: 'url_seguro', label: 'Seguro / Mala Praxis' },
+                  { id: 'url_cbu', label: 'Constancia CBU' },
+                  { id: 'url_matricula', label: 'Matrícula Prof.' }
+                ].map((doc) => (
+                  <div key={doc.id}>
+                    <label className={`flex flex-col items-center justify-center p-6 rounded-[2.5rem] border-2 border-dashed transition-all cursor-pointer h-36 ${targetPerfil[doc.id] ? 'border-[#84bd00] bg-green-50' : 'border-gray-200 bg-gray-50 hover:border-[#84bd00]'}`}>
+                      <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, doc.id)} disabled={uploading === doc.id} />
+                      {uploading === doc.id ? (
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#84bd00]"></div>
+                      ) : targetPerfil[doc.id] ? (
+                        <>
+                          <CheckCircle className="text-[#84bd00] mb-2" size={24}/>
+                          <span className="text-[8px] font-black text-[#84bd00] uppercase text-center">{doc.label}</span>
+                          <div className="flex gap-2 mt-2">
+                            <a href={targetPerfil[doc.id]} target="_blank" rel="noreferrer" className="text-[7px] font-black text-white bg-[#84bd00] px-3 py-1 rounded-full uppercase shadow-sm shadow-green-200">Ver</a>
+                            <span className="text-[7px] font-black text-gray-400 bg-white px-3 py-1 rounded-full border border-gray-100 uppercase">Cambiar</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="text-gray-300 mb-2" size={24}/>
+                          <span className="text-[9px] font-black text-gray-500 uppercase text-center leading-tight">{doc.label}</span>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-10 bg-gray-50 border-t flex justify-end">
+              <button onClick={handleUpdate} className="bg-[#84bd00] text-white px-10 py-5 rounded-3xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center gap-3 transition-all hover:scale-105 active:scale-95">
+                <Save size={20}/> Guardar Legajo Completo
+              </button>
+            </div>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

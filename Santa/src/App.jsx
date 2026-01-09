@@ -1,37 +1,35 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { APP_CONFIG } from './constants/Config';
 
 // --- IMPORTACIÓN DE PÁGINAS ---
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Calendario from './pages/Calendario';
 
-// 1. Módulo de Alumnos (Legajos y Evoluciones)
+// Módulo Alumnos
 import Legajos from './pages/Legajos'; 
 import FichaAlumno from './pages/FichaAlumno';
-import EditarAlumno from './pages/EditarAlumno';
 import AltaAlumno from './pages/AltaAlumno';
+import EditarAlumno from './pages/EditarAlumno';
 import Evoluciones from './pages/Evoluciones';
-import FichaEmergencia from './components/FichaEmergencia'; // <--- NUEVA IMPORTACIÓN v2.0
+import FichaEmergencia from './components/FichaEmergencia'; 
 
-// 2. Módulo de Personal y RRHH
+// Módulo RRHH / Personal
 import ListaPersonal from './pages/ListaPersonal';
 import RegistroProfesional from './pages/RegistroProfesional'; 
-import EditarPersonal from './pages/EditarPersonal';
 import MiPerfil from './pages/MiPerfil';
 
-// 3. Módulo de Administración y Cobranzas
+// Módulo Administración
 import ListaCobranzas from './pages/ListaCobranzas';
 import RegistroPagoAlumno from './pages/RegistroPagoAlumno';
-import Estadisticas from './pages/Estadisticas'; 
 
-// 4. Hub de Reportes Institucionales y Auditoría
+// Módulo Reportes y Auditoría
 import ReportesMenu from './pages/ReportesMenu';
-import ReporteDocumentacion from './pages/ReporteDocumentacion';
-import ResumenCajaDiaria from './pages/ResumenCajaDiaria'; 
-import ReporteObraSocial from './pages/ReporteObraSocial'; 
-
-// 5. Otros Módulos
-import Calendario from './pages/Calendario';
+import ReporteLegajos from './pages/ReporteLegajos';
+import ReporteLegajosAlumnos from './pages/ReporteLegajosAlumnos';
+import ReporteCaja from './pages/ReporteCaja';
+import ReporteAsistencia from './pages/ReporteAsistencia';
 
 function App() {
   return (
@@ -47,41 +45,39 @@ function App() {
           />
         </div>
 
-        {/* ENRUTADOR DE SECCIONES */}
+        {/* CONTENIDO DE RUTAS */}
         <div className="relative z-10">
           <Routes>
             {/* ACCESO Y DASHBOARD */}
             <Route path="/" element={<Login />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/calendario" element={<Calendario />} />
 
-            {/* GESTIÓN DE ALUMNOS v2.0 */}
+            {/* MÓDULO ALUMNOS */}
             <Route path="/legajos" element={<Legajos />} />
             <Route path="/legajo/:id" element={<FichaAlumno />} />
             <Route path="/alta-alumno" element={<AltaAlumno />} />
             <Route path="/editar-alumno/:id" element={<EditarAlumno />} />
             <Route path="/evoluciones" element={<Evoluciones />} />
-            {/* RUTA PARA IMPRESIÓN DE FICHA MÉDICA */}
             <Route path="/alumno/:id/ficha-medica" element={<FichaEmergencia />} />
 
-            {/* COBRANZAS Y FINANZAS */}
-            <Route path="/cobranzas" element={<ListaCobranzas />} />
-            <Route path="/registrar-pago/:alumnoId" element={<RegistroPagoAlumno />} />
-
-            {/* HUB DE REPORTES Y AUDITORÍA */}
-            <Route path="/reportes" element={<ReportesMenu />} />
-            <Route path="/reporte-documentacion" element={<ReporteDocumentacion />} />
-            <Route path="/reporte-caja-diaria" element={<ResumenCajaDiaria />} />
-            <Route path="/reporte-obra-social" element={<ReporteObraSocial />} />
-            <Route path="/estadisticas" element={<Estadisticas />} />
-
-            {/* PERSONAL Y CONFIGURACIÓN */}
+            {/* MÓDULO RRHH / PERSONAL (MiPerfil unificado) */}
             <Route path="/personal" element={<ListaPersonal />} />
             <Route path="/registro-personal" element={<RegistroProfesional />} />
-            <Route path="/editar-personal/:id" element={<EditarPersonal />} />
             <Route path="/mi-perfil" element={<MiPerfil />} />
+            <Route path="/perfil/:id" element={<MiPerfil />} />
+            <Route path="/editar-personal/:id" element={<MiPerfil />} />
 
-            {/* AGENDA Y CALENDARIO */}
-            <Route path="/calendario" element={<Calendario />} />
+            {/* MÓDULO ADMINISTRACIÓN */}
+            <Route path="/cobranzas" element={<ListaCobranzas />} />
+            <Route path="/registrar-pago/:alumnoId" element={<RegistroPagoAlumno />} />
+            
+            {/* MÓDULO REPORTES Y AUDITORÍA v2.0 */}
+            <Route path="/reportes" element={<ReportesMenu />} />
+            <Route path="/reporte-legajos" element={<ReporteLegajos />} />
+            <Route path="/reporte-legajos-alumnos" element={<ReporteLegajosAlumnos />} />
+            <Route path="/reportes-caja" element={<ReporteCaja />} />
+            <Route path="/reportes-asistencia" element={<ReporteAsistencia />} />
           </Routes>
         </div>
       </div>
