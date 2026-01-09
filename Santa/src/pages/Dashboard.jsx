@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase'; // Sale de pages/ y entra a lib/
 import { useNavigate } from 'react-router-dom';
-import { APP_CONFIG } from '../constants/Config';
+import { APP_CONFIG } from '../constants/config'; // Sale de pages/ y entra a constants/
 import { 
   LogOut, Calendar, Users, BarChart3, 
   ClipboardList, User, Settings, DollarSign 
@@ -35,14 +35,15 @@ const Dashboard = () => {
 
   if (loading) return (
     <div className="h-screen flex items-center justify-center font-black text-[#84bd00] animate-pulse uppercase text-xs">
-      Cargando {APP_CONFIG.sistema} v{APP_CONFIG.version}...
+      Sincronizando {APP_CONFIG.sistema} v{APP_CONFIG.version}...
     </div>
   );
 
   return (
     <div className="min-h-screen p-6 md:p-10 flex flex-col animate-fade-in bg-transparent">
+      {/* El contenido del Dashboard se mantiene igual, las rutas de navigate() 
+          no cambian porque son rutas lógicas definidas en App.jsx */}
       <div className="flex-grow max-w-7xl mx-auto w-full">
-        
         <header className="bg-white/90 backdrop-blur-md p-8 rounded-[2.5rem] shadow-sm border border-white flex justify-between items-center mb-10">
           <div>
             <h1 className="text-3xl font-black text-gray-800 tracking-tighter leading-none">
@@ -58,7 +59,6 @@ const Dashboard = () => {
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-10">
-          
           <div onClick={() => navigate('/calendario')} className="bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm hover:shadow-xl transition-all cursor-pointer group border border-white">
             <div className="bg-sky-500 w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-sky-100"><Calendar size={28}/></div>
             <h2 className="text-xl font-black text-sky-600 uppercase tracking-tighter">Agenda</h2>
@@ -98,7 +98,6 @@ const Dashboard = () => {
               </div>
             </>
           )}
-
         </div>
       </div>
 
