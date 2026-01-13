@@ -5,18 +5,22 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 
-// --- MÓDULO ADMIN ---
+// --- MÓDULO ADMIN & FACTURACIÓN (Tesorería v3.1) ---
 import Calendario from './pages/admin/Calendario';
 import ListaCobranzas from './pages/admin/ListaCobranzas';
 import RegistroPagoAlumno from './pages/admin/RegistroPagoAlumno';
+import GestionAranceles from './pages/admin/GestionAranceles'; 
+import GeneradorFacturas from './pages/admin/GeneradorFacturas'; 
 
-// --- MÓDULO ALUMNOS ---
-import Legajos from './pages/alumnos/Legajos'; // Este es el listado general
-import FichaAlumno from './pages/alumnos/FichaAlumno'; // Este es el detalle con ID
-import AltaAlumno from './pages/alumnos/AltaAlumno';
-import EditarAlumno from './pages/alumnos/EditarAlumno';
-import Evoluciones from './pages/alumnos/Evoluciones';
+// --- MÓDULO ALUMNOS (Administración / Back-Office) ---
+import Legajos from './pages/alumnos/Legajos'; 
+import FichaAlumno from './pages/alumnos/FichaAlumno'; 
+import AltaAlumno from './pages/alumnos/AltaAlumno'; // Gestión 14 puntos v3.1
+import EditarAlumno from './pages/alumnos/EditarAlumno'; // Gestión 14 puntos v3.1
 import FichaEmergencia from './components/FichaEmergencia'; 
+
+// --- MÓDULO OPERATIVO (Actividad Diaria / Front-Office) ---
+import ActividadDiaria from './pages/alumnos/ActividadDiaria'; // <--- Nueva v3.1
 
 // --- MÓDULO RRHH ---
 import ListaPersonal from './pages/rrhh/ListaPersonal';
@@ -50,13 +54,15 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/calendario" element={<Calendario />} />
 
-            {/* MÓDULO ALUMNOS v2.1 */}
+            {/* 🛡️ PARTE 1: GESTIÓN ADMINISTRATIVA (Legajos y Datos Maestros) */}
             <Route path="/legajos" element={<Legajos />} /> 
             <Route path="/legajo/:id" element={<FichaAlumno />} />
             <Route path="/alta-alumno" element={<AltaAlumno />} />
             <Route path="/editar-alumno/:id" element={<EditarAlumno />} />
-            <Route path="/evoluciones" element={<Evoluciones />} />
             <Route path="/alumno/:id/ficha-medica" element={<FichaEmergencia />} />
+
+            {/* 🚀 PARTE 2: GESTIÓN OPERATIVA (Actividad Diaria / Evoluciones) */}
+            <Route path="/actividad-diaria" element={<ActividadDiaria />} />
 
             {/* MÓDULO RRHH */}
             <Route path="/personal" element={<ListaPersonal />} />
@@ -65,9 +71,13 @@ function App() {
             <Route path="/perfil/:id" element={<MiPerfil />} />
             <Route path="/editar-personal/:id" element={<MiPerfil />} />
 
-            {/* ADMINISTRACIÓN Y REPORTES */}
+            {/* MÓDULO ADMINISTRACIÓN Y FACTURACIÓN (Unificado ARCA) */}
             <Route path="/cobranzas" element={<ListaCobranzas />} />
             <Route path="/registrar-pago/:alumnoId" element={<RegistroPagoAlumno />} />
+            <Route path="/gestion-aranceles" element={<GestionAranceles />} />
+            <Route path="/generar-facturas" element={<GeneradorFacturas />} />
+
+            {/* MÓDULO REPORTES */}
             <Route path="/reportes" element={<ReportesMenu />} />
             <Route path="/reporte-legajos" element={<ReporteLegajos />} />
             <Route path="/reporte-legajos-alumnos" element={<ReporteLegajosAlumnos />} />
