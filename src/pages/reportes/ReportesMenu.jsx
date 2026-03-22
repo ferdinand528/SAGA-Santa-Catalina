@@ -1,12 +1,41 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase'; // 👈 Añadido
 import { 
   ArrowLeft, FileWarning, ClipboardCheck, 
-  DollarSign, Users, HeartPulse 
+  DollarSign, Users, HeartPulse, Loader2 
 } from 'lucide-react';
 
 const ReportesMenu = () => {
   const navigate = useNavigate();
+  const [perfil, setPerfil] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // 1. CARGAR ROL DEL USUARIO
+  useEffect(() => {
+    async function obtenerPerfil() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data } = await supabase
+            .from('perfiles')
+            .select('rol')
+            .eq('id', user.id)
+            .single();
+          setPerfil(data);
+        }
+      } catch (error) {
+        console.error("Error al obtener perfil:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    obtenerPerfil();
+  }, []);
+
+  // 🛡️ DEFINICIÓN DE PERMISOS (Incluye Coordinación)
+  const rolUsuario = perfil?.rol?.toLowerCase();
+  const esGestion = ['director', 'administrador', 'coordinacion'].includes(rolUsuario);
 
   const menuItems = [
     {
@@ -15,7 +44,8 @@ const ReportesMenu = () => {
       icon: <FileWarning size={28} />,
       path: "/reporte-legajos",
       color: "bg-red-500",
-      shadow: "shadow-red-100"
+      shadow: "shadow-red-100",
+      soloGestion: true // 👈 Solo para Directivos/Admin/Coord
     },
     {
       title: "Auditoría Legajos Alumnos",
@@ -23,7 +53,8 @@ const ReportesMenu = () => {
       icon: <ClipboardCheck size={28} />,
       path: "/reporte-legajos-alumnos",
       color: "bg-indigo-600",
-      shadow: "shadow-indigo-100"
+      shadow: "shadow-indigo-100",
+      soloGestion: true
     },
     {
       title: "Reporte de Cobranzas",
@@ -31,7 +62,8 @@ const ReportesMenu = () => {
       icon: <DollarSign size={28} />,
       path: "/reportes-caja",
       color: "bg-emerald-500",
-      shadow: "shadow-emerald-100"
+      shadow: "shadow-emerald-100",
+      soloGestion: true
     },
     {
       title: "Asistencia Mensual",
@@ -39,17 +71,28 @@ const ReportesMenu = () => {
       icon: <Users size={28} />,
       path: "/reportes-asistencia",
       color: "bg-blue-500",
-      shadow: "shadow-blue-100"
+      shadow: "shadow-blue-100",
+      soloGestion: false // 👈 Visible para todos
     },
     {
-      title: "Censo de Obra Social", // <--- ESTE ES EL 5TO BOTÓN
+      title: "Censo de Obra Social",
       desc: "Padrón detallado por entidad",
       icon: <HeartPulse size={28} />,
       path: "/censo-obra-social",
       color: "bg-purple-600",
-      shadow: "shadow-purple-100"
+      shadow: "shadow-purple-100",
+      soloGestion: true
     }
   ];
+
+  // Filtramos la lista según el rol
+  const itemsVisibles = menuItems.filter(item => !item.soloGestion || esGestion);
+
+  if (loading) return (
+    <div className="h-screen flex items-center justify-center bg-transparent">
+      <Loader2 className="animate-spin text-[#84bd00]" size={32} />
+    </div>
+  );
 
   return (
     <div className="min-h-screen p-6 md:p-10 bg-transparent font-sans animate-fade-in">
@@ -61,16 +104,16 @@ const ReportesMenu = () => {
           >
             <ArrowLeft size={18} /> Volver al Dashboard
           </button>
-          <h1 className="text-4xl font-black text-gray-800 tracking-tighter uppercase mt-6 leading-none">
+          <h1 className="text-4xl font-black text-[#1a3a5f] tracking-tighter uppercase mt-6 leading-none">
             Centro de <span className="text-[#84bd00]">Reportes</span>
           </h1>
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">
-            Instituto Santa Catalina • v2.1
+            Instituto Santa Catalina • {esGestion ? 'Acceso Jerárquico v3.1' : 'Acceso Docente v3.1'}
           </p>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {menuItems.map((item, index) => (
+          {itemsVisibles.map((item, index) => (
             <div 
               key={index}
               onClick={() => navigate(item.path)}
@@ -90,6 +133,12 @@ const ReportesMenu = () => {
             </div>
           ))}
         </div>
+
+        {itemsVisibles.length === 0 && (
+          <div className="text-center py-20 bg-white/20 backdrop-blur-sm rounded-[3rem]">
+            <p className="text-gray-400 font-black uppercase text-xs tracking-[0.3em]">No tienes reportes asignados a tu rol</p>
+          </div>
+        )}
       </div>
     </div>
   );

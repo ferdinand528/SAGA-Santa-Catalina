@@ -25,7 +25,7 @@ const FichaAlumno = () => {
 
   // 🛡️ Lógica de Roles Estandarizada
   const rolUsuario = perfil?.rol?.toLowerCase();
-  const esGestion = rolUsuario === 'director' || rolUsuario === 'administrador' || rolUsuario === 'admin';
+  const esGestion = ['director', 'administrador', 'coordinacion'].includes(rolUsuario);
 
   const cargarEvoluciones = useCallback(async () => {
     const { data } = await supabase
