@@ -7,6 +7,34 @@ import {
   ImageIcon, Save, Edit3, XCircle, Trash2 
 } from 'lucide-react';
 
+// --- 🪄 FUNCIÓN DE COMPRESIÓN (Definida fuera para evitar el ReferenceError) ---
+const comprimirImagen = (archivo) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(archivo);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200; 
+        const scaleSize = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scaleSize;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        ctx.canvas.toBlob((blob) => {
+          const fileComprimido = new File([blob], archivo.name, {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          });
+          resolve(fileComprimido);
+        }, 'image/jpeg', 0.7);
+      };
+    };
+  });
+};
+
 const FichaAlumno = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -50,13 +78,7 @@ const FichaAlumno = () => {
 
       const { data: alu, error: aluError } = await supabase
         .from('alumnos')
-        .select(`
-          id, apellido, nombre, dni, patologia, activo,
-          doc_dni_alumno, doc_dni_tutor, doc_cuil_alumno, doc_cuil_tutor,
-          doc_cud, doc_historia_clinica, doc_vacunacion, doc_obra_social,
-          doc_anamnesis, doc_permiso_fotos, doc_permiso_salidas, 
-          doc_permiso_transporte, doc_informe_evaluacion, doc_plan_tratamiento
-        `)
+        .select(`*`)
         .eq('id', id)
         .single();
 
@@ -78,17 +100,30 @@ const FichaAlumno = () => {
     initFicha();
   }, [initFicha]);
 
+  // 🛡️ POLÍTICA DE LIMPIEZA: Borra de Storage y luego de la DB
   const borrarEvolucion = async (evolucionId) => {
-    const confirmar = window.confirm("¿Estás seguro de eliminar este registro?");
+    const confirmar = window.confirm("¿Estás seguro? Se eliminará el registro y sus fotos permanentemente.");
     if (!confirmar) return;
 
     setSaving(true);
     try {
-      const { error } = await supabase.from('evoluciones').delete().eq('id', evolucionId);
-      if (error) throw error;
+      const { data: ev } = await supabase
+        .from('evoluciones')
+        .select('fotos')
+        .eq('id', evolucionId)
+        .single();
+
+      if (ev?.fotos?.length > 0) {
+        const pathsABorrar = ev.fotos.map(url => url.split('actividades/')[1]);
+        await supabase.storage.from('actividades').remove(pathsABorrar);
+      }
+
+      const { error: errorDB } = await supabase.from('evoluciones').delete().eq('id', evolucionId);
+      if (errorDB) throw errorDB;
+
       await cargarEvoluciones();
     } catch (err) {
-      alert("Error: " + err.message);
+      alert("Error en la limpieza: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -113,7 +148,7 @@ const FichaAlumno = () => {
   };
 
   const toggleDoc = async (campo, valorActual) => {
-    if (!esGestion) return; // 🛡️ Bloqueo de seguridad
+    if (!esGestion) return; 
     try {
       const nuevoValor = !valorActual;
       await supabase.from('alumnos').update({ [campo]: nuevoValor }).eq('id', id);
@@ -121,12 +156,30 @@ const FichaAlumno = () => {
     } catch (error) { console.error(error); }
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const files = Array.from(e.target.files);
-    if (fotos.length + files.length > 5) { alert("Máximo 5 fotos."); return; }
-    const newPreviews = files.map(file => URL.createObjectURL(file));
-    setFotos(prev => [...prev, ...files]);
-    setPreviews(prev => [...prev, ...newPreviews]);
+    if (fotos.length + files.length > 5) { 
+      alert("Máximo 5 fotos."); 
+      return; 
+    }
+
+    setSaving(true); 
+    const fotosComprimidas = [];
+    const nuevasPreviews = [];
+
+    for (const file of files) {
+      try {
+        const comprimida = await comprimirImagen(file); // 🪄 Ahora sí está definida
+        fotosComprimidas.push(comprimida);
+        nuevasPreviews.push(URL.createObjectURL(comprimida));
+      } catch (e) {
+        console.error("Error comprimiendo:", e);
+      }
+    }
+
+    setFotos(prev => [...prev, ...fotosComprimidas]);
+    setPreviews(prev => [...prev, ...nuevasPreviews]);
+    setSaving(false);
   };
 
   const guardarActividad = async () => {
@@ -135,19 +188,29 @@ const FichaAlumno = () => {
     try {
       let urlsFinales = [];
       for (const file of fotos) {
-        const fileName = `${id}/${Date.now()}-${Math.random()}.${file.name.split('.').pop()}`;
+        const extension = file.name.split('.').pop() || 'jpg';
+        const fileName = `${id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${extension}`;
+        
         const { error: upError } = await supabase.storage.from('actividades').upload(fileName, file);
-        if (!upError) {
-          const { data: { publicUrl } } = supabase.storage.from('actividades').getPublicUrl(fileName);
-          urlsFinales.push(publicUrl);
-        }
+        if (upError) throw upError;
+
+        const { data: { publicUrl } } = supabase.storage.from('actividades').getPublicUrl(fileName);
+        urlsFinales.push(publicUrl);
       }
-      await supabase.from('evoluciones').insert([{ 
+
+      const { error: insError } = await supabase.from('evoluciones').insert([{ 
         alumno_id: id, profesional_id: perfil.id, contenido: nuevaActividad, 
         area: perfil.profesion || 'Docencia', fotos: urlsFinales, fecha: new Date().toISOString() 
       }]);
+      
+      if (insError) throw insError;
+
       setNuevaActividad(""); setFotos([]); setPreviews([]); await cargarEvoluciones();
-    } catch (err) { alert(err.message); } finally { setSaving(false); }
+    } catch (err) { 
+      alert("Error al guardar: " + err.message); 
+    } finally { 
+      setSaving(false); 
+    }
   };
 
   const docsChecklist = [
@@ -185,7 +248,6 @@ const FichaAlumno = () => {
           </div>
         </header>
 
-        {/* 🛡️ SECCIÓN DE CONTROL: SOLO GESTIÓN */}
         {esGestion && (
           <div className="mb-10 bg-white/80 backdrop-blur-md p-8 rounded-[3rem] border border-white shadow-sm print:hidden">
             <div className="flex items-center gap-4 mb-6 border-b pb-4 text-blue-600">
@@ -214,7 +276,7 @@ const FichaAlumno = () => {
                 "{alumno?.patologia || "SIN DIAGNÓSTICO"}"
               </h4>
             </div>
-            <button onClick={() => window.open(`/alumno/${id}/ficha-medica`, '_blank')} className="w-full bg-red-600 text-white p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3 shadow-lg shadow-red-50 hover:bg-black transition-all">
+            <button onClick={() => window.open(`/alumno/${id}/ficha-medica`, '_blank')} className="w-full bg-red-600 text-white p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3 shadow-lg hover:bg-black transition-all">
               <Printer size={18}/> Imprimir Ficha Médica
             </button>
           </div>
@@ -227,14 +289,14 @@ const FichaAlumno = () => {
               </div>
               <textarea className="w-full p-8 bg-white rounded-[2rem] border-none outline-none font-bold text-gray-700 shadow-inner focus:ring-4 focus:ring-orange-100 transition-all mb-6 min-h-[150px] resize-none" placeholder="Escribí aquí el resumen de hoy..." value={nuevaActividad} onChange={(e) => setNuevaActividad(e.target.value)} />
               <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                 <label className="flex items-center gap-2 text-[10px] font-black text-orange-600 uppercase cursor-pointer bg-white px-6 py-4 rounded-2xl shadow-sm hover:bg-orange-50 transition-all border border-orange-50">
+                 <label className="flex items-center gap-2 text-[10px] font-black text-orange-600 uppercase cursor-pointer bg-white px-6 py-4 rounded-2xl shadow-sm border border-orange-50 hover:bg-orange-50 transition-all">
                    <ImageIcon size={18} />
                    <span>Cargar Fotos ({fotos.length}/5)</span>
                    <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileChange} />
                  </label>
                  <button onClick={guardarActividad} disabled={saving || !nuevaActividad} className="w-full md:w-auto bg-[#ff6b00] text-white px-10 py-5 rounded-[1.5rem] font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-[#1a3a5f] transition-all flex items-center justify-center gap-3 disabled:opacity-50">
                   {saving ? <Loader2 className="animate-spin" /> : <Save size={18}/>}
-                  {saving ? 'GUARDANDO...' : 'REGISTRAR ACTIVIDAD'}
+                  {saving ? 'PROCESANDO...' : 'REGISTRAR ACTIVIDAD'}
                 </button>
               </div>
             </div>
@@ -249,12 +311,7 @@ const FichaAlumno = () => {
           
           <div className="space-y-12">
             {evoluciones.map((e) => {
-              const ahora = new Date();
-              const creacion = new Date(e.fecha);
-              const diferenciaMin = (ahora - creacion) / 60000;
               const esPropio = e.profesional_id === perfil?.id;
-              const dentroDelTiempo = diferenciaMin <= 10;
-              const puedeModificar = esPropio && dentroDelTiempo;
 
               return (
                 <div key={e.id} className="relative pl-8 border-l-2 border-gray-100 pb-10 last:border-0 last:pb-0">
@@ -267,46 +324,20 @@ const FichaAlumno = () => {
                     </div>
                     
                     <div className="flex items-center gap-4">
-                      {puedeModificar && editandoId !== e.id && (
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => { setEditandoId(e.id); setContenidoEditado(e.contenido); }}
-                            className="flex items-center gap-1 text-[9px] font-black text-orange-500 uppercase bg-orange-50 px-3 py-1 rounded-lg hover:bg-orange-100 transition-all"
-                          >
-                            <Edit3 size={12}/> Editar
-                          </button>
-                          <button 
-                            onClick={() => borrarEvolucion(e.id)}
-                            className="flex items-center gap-1 text-[9px] font-black text-red-500 uppercase bg-red-50 px-3 py-1 rounded-lg hover:bg-red-500 hover:text-white transition-all"
-                          >
-                            <Trash2 size={12}/> Borrar
-                          </button>
-                        </div>
+                      {esPropio && (
+                        <button 
+                          onClick={() => borrarEvolucion(e.id)}
+                          className="flex items-center gap-1 text-[9px] font-black text-red-500 uppercase bg-red-50 px-3 py-1 rounded-lg hover:bg-red-500 hover:text-white transition-all"
+                        >
+                          <Trash2 size={12}/> Borrar
+                        </button>
                       )}
                       <span className="text-[9px] font-black text-gray-300 uppercase italic">Prof: {e.perfiles?.nombre_completo}</span>
                     </div>
                   </div>
 
                   <div className="bg-gray-50/50 p-8 rounded-[2.5rem] border border-gray-50 shadow-inner">
-                    {editandoId === e.id ? (
-                      <div className="space-y-4">
-                        <textarea 
-                          className="w-full p-6 bg-white rounded-2xl border-2 border-orange-200 outline-none font-medium text-sm text-gray-700"
-                          value={contenidoEditado}
-                          onChange={(e) => setContenidoEditado(e.target.value)}
-                        />
-                        <div className="flex gap-2">
-                          <button onClick={() => actualizarEvolucion(e.id)} className="bg-orange-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-md shadow-orange-100">
-                            <Save size={14}/> Guardar
-                          </button>
-                          <button onClick={() => setEditandoId(null)} className="bg-gray-200 text-gray-500 px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2">
-                            <XCircle size={14}/> Cancelar
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-700 leading-relaxed font-medium italic">"{e.contenido}"</p>
-                    )}
+                    <p className="text-sm text-gray-700 leading-relaxed font-medium italic">"{e.contenido}"</p>
                     {e.fotos?.length > 0 && (
                       <div className="flex flex-wrap gap-3 mt-6">
                         {e.fotos.map((url, i) => (
