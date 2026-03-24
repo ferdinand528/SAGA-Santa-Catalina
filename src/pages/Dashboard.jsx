@@ -5,7 +5,7 @@ import { APP_CONFIG } from '../constants/config';
 import { 
   LogOut, Calendar, Users, BarChart3, 
   ClipboardList, Settings, DollarSign,
-  ShieldCheck
+  ShieldCheck, Loader2
 } from 'lucide-react';
 
 const Dashboard = () => {
@@ -35,16 +35,23 @@ const Dashboard = () => {
     navigate('/', { replace: true });
   };
 
-  const esGestion = perfil?.rol === 'director' || perfil?.rol === 'administrador';
+  // 🛡️ NUEVA LÓGICA DE ROLES ESTANDARIZADA
+  const rolUsuario = perfil?.rol?.toLowerCase();
+  const esDirector = rolUsuario === 'director'; // Súper Usuario
+  const esGestion = ['director', 'administrador', 'coordinacion'].includes(rolUsuario);
 
   if (loading) return (
-    <div className="h-screen flex items-center justify-center font-black text-[#84bd00] animate-pulse uppercase text-xs tracking-widest">
-      Sincronizando {APP_CONFIG.sistema} v3.1...
+    <div className="h-screen flex flex-col items-center justify-center bg-transparent">
+      <Loader2 className="animate-spin text-[#84bd00] mb-4" size={32} />
+      <p className="font-black text-gray-400 uppercase text-[10px] tracking-widest">
+        Sincronizando {APP_CONFIG.sistema} v3.3...
+      </p>
     </div>
   );
 
   return (
-    <div className="min-h-screen p-6 md:p-10 flex flex-col animate-fade-in bg-[#fcfaf7]">
+    /* 🖼️ CAMBIO: bg-transparent para mostrar el logo de fondo */
+    <div className="min-h-screen p-6 md:p-10 flex flex-col animate-fade-in bg-transparent">
       
       <div className="flex-grow max-w-7xl mx-auto w-full">
         
@@ -94,31 +101,32 @@ const Dashboard = () => {
             <p className="text-gray-400 text-[10px] font-bold uppercase mt-1">Seguridad y Perfil</p>
           </div>
 
-          {/* SECCIÓN GESTIÓN (RESTRIGIDA) */}
+          {/* 🛡️ SECCIÓN TESORERÍA: SOLO DIRECTOR */}
+          {esDirector && (
+            <div onClick={() => navigate('/gestion-aranceles')} className="relative bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer group border border-white">
+              <div className="absolute top-8 right-8 bg-[#84bd00] text-white text-[7px] font-black px-2 py-1 rounded-md tracking-tighter uppercase">PV 2 Masivo</div>
+              <div className="bg-emerald-500 w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-emerald-100 group-hover:scale-110 transition-transform"><DollarSign size={28}/></div>
+              <h2 className="text-xl font-black text-emerald-600 uppercase tracking-tighter">Tesorería</h2>
+              <p className="text-gray-400 text-[10px] font-bold uppercase mt-1">Lotes ARCA y Cobranzas</p>
+            </div>
+          )}
+
+          {/* 🛡️ SECCIÓN PERSONAL: SOLO DIRECTOR */}
+          {esDirector && (
+            <div onClick={() => navigate('/personal')} className="bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer group border border-white">
+              <div className="bg-indigo-500 w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-indigo-100 group-hover:scale-110 transition-transform"><ClipboardList size={28}/></div>
+              <h2 className="text-xl font-black text-indigo-600 uppercase tracking-tighter">Personal</h2>
+              <p className="text-gray-400 text-[10px] font-bold uppercase mt-1">RRHH y Plantel Técnico</p>
+            </div>
+          )}
+
+          {/* SECCIÓN REPORTES: TODA LA GESTIÓN (Internamente el menú filtrará qué ven) */}
           {esGestion && (
-            <>
-              {/* Tesorería (ARCA Facturador Plus) */}
-              <div onClick={() => navigate('/gestion-aranceles')} className="relative bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer group border border-white">
-                <div className="absolute top-8 right-8 bg-[#84bd00] text-white text-[7px] font-black px-2 py-1 rounded-md tracking-tighter uppercase">PV 2 Masivo</div>
-                <div className="bg-emerald-500 w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-emerald-100 group-hover:scale-110 transition-transform"><DollarSign size={28}/></div>
-                <h2 className="text-xl font-black text-emerald-600 uppercase tracking-tighter">Tesorería</h2>
-                <p className="text-gray-400 text-[10px] font-bold uppercase mt-1">Lotes ARCA y Cobranzas</p>
-              </div>
-
-              {/* Personal */}
-              <div onClick={() => navigate('/personal')} className="bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer group border border-white">
-                <div className="bg-indigo-500 w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-indigo-100 group-hover:scale-110 transition-transform"><ClipboardList size={28}/></div>
-                <h2 className="text-xl font-black text-indigo-600 uppercase tracking-tighter">Personal</h2>
-                <p className="text-gray-400 text-[10px] font-bold uppercase mt-1">RRHH y Plantel Técnico</p>
-              </div>
-
-              {/* Reportes */}
-              <div onClick={() => navigate('/reportes')} className="bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer group border border-white">
-                <div className="bg-red-500 w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-red-100 group-hover:scale-110 transition-transform"><BarChart3 size={28}/></div>
-                <h2 className="text-xl font-black text-red-600 uppercase tracking-tighter">Reportes</h2>
-                <p className="text-gray-400 text-[10px] font-bold uppercase mt-1">Auditoría General</p>
-              </div>
-            </>
+            <div onClick={() => navigate('/reportes')} className="bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer group border border-white">
+              <div className="bg-red-500 w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-red-100 group-hover:scale-110 transition-transform"><BarChart3 size={28}/></div>
+              <h2 className="text-xl font-black text-red-600 uppercase tracking-tighter">Reportes</h2>
+              <p className="text-gray-400 text-[10px] font-bold uppercase mt-1">Auditoría General</p>
+            </div>
           )}
         </div>
       </div>
@@ -126,7 +134,7 @@ const Dashboard = () => {
       <footer className="mt-auto py-6 text-center">
         <div className="bg-white/40 backdrop-blur-sm inline-block px-8 py-3 rounded-full border border-white/20 shadow-sm">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">
-            {APP_CONFIG.sistema} <span className="text-[#84bd00]">v3.1</span> <span className="mx-3 text-[#84bd00] font-black">•</span> {APP_CONFIG.institucion}
+            {APP_CONFIG.sistema} <span className="text-[#84bd00]">v3.3</span> <span className="mx-3 text-[#84bd00] font-black">•</span> {APP_CONFIG.institucion}
           </p>
         </div>
       </footer>

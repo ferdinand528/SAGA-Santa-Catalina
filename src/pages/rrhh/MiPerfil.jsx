@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, Save, Mail, Fingerprint, Briefcase, 
-  FileText, ShieldCheck, Key, UploadCloud, Loader2, 
-  CheckCircle, Lock, MapPin, Phone, Maximize2, XCircle
+  ArrowLeft, Save, Mail, Briefcase, 
+  FileText, Key, UploadCloud, Loader2, 
+  CheckCircle, Lock, MapPin, Phone
 } from 'lucide-react';
 
 const NOMBRE_BUCKET = 'documentacion_personal';
@@ -32,7 +32,6 @@ const MiPerfil = () => {
     doc_titulo: false, doc_conducta: false, doc_afip: false, doc_cbu: false
   });
 
-  // Estado para capturar los archivos físicos antes de subirlos
   const [nuevosArchivos, setNuevosArchivos] = useState({});
 
   useEffect(() => {
@@ -79,7 +78,6 @@ const MiPerfil = () => {
     try {
       const updatesDocMetadata = {};
 
-      // 1. PROCESO DE SUBIDA DE ARCHIVOS A SUPABASE STORAGE
       for (const [campo, archivo] of Object.entries(nuevosArchivos)) {
         const extension = archivo.name.split('.').pop();
         const rutaArchivo = `${perfil.id}/${campo}.${extension}`;
@@ -89,12 +87,9 @@ const MiPerfil = () => {
           .upload(rutaArchivo, archivo, { upsert: true });
 
         if (uploadError) throw uploadError;
-        
-        // Si subió bien, marcamos el campo para actualizar en la tabla perfiles
         updatesDocMetadata[campo] = true;
       }
 
-      // 2. ACTUALIZACIÓN DE DATOS EN TABLA 'PERFILES'
       const updates = {
         nombre_completo: perfil.nombre_completo.toUpperCase(),
         dni: perfil.dni,
@@ -102,20 +97,30 @@ const MiPerfil = () => {
         domicilio: perfil.domicilio?.toUpperCase(),
         celular: perfil.celular,
         ...docs,
-        ...updatesDocMetadata // Sumamos los tildes de los archivos recién subidos
+        ...updatesDocMetadata 
       };
 
-      // 3. ACTUALIZACIÓN DE AUTH (Password) si se ingresó algo
-      if (perfil.password) {
+      // 🛡️ SOLUCIÓN AL ERROR DE CONTRASEÑA
+      if (perfil.password && perfil.password.trim().length >= 6) {
         const { error: authError } = await supabase.auth.updateUser({ password: perfil.password });
-        if (authError) throw authError;
+        
+        if (authError) {
+          // Si el error es que la clave es igual a la anterior, lo ignoramos para que guarde el resto de los datos
+          if (!authError.message.includes("should be different")) {
+            throw authError;
+          }
+        }
       }
 
       const { error } = await supabase.from('perfiles').update(updates).eq('id', perfil.id);
       if (error) throw error;
 
       alert("Legajo y Archivos actualizados correctamente.");
-      setNuevosArchivos({}); // Limpiar cola de subida
+      
+      // Limpiamos los campos de password después de guardar con éxito
+      setPerfil(prev => ({ ...prev, password: '', repetir_password: '' }));
+      setNuevosArchivos({}); 
+
     } catch (err) {
       alert("Error: " + err.message);
     } finally {
@@ -123,7 +128,6 @@ const MiPerfil = () => {
     }
   };
 
-  // --- COMPONENTE INTERACTIVO DE CARGA DE ARCHIVOS ---
   const DocSlot = ({ label, campo }) => {
     const tieneArchivoEnDB = docs[campo];
     const tieneArchivoNuevo = nuevosArchivos[campo];
@@ -165,9 +169,6 @@ const MiPerfil = () => {
           }`}>
             {tieneArchivoNuevo ? 'LISTO PARA SUBIR' : tieneArchivoEnDB ? `YA CARGADO` : label}
           </span>
-          {tieneArchivoEnDB && !tieneArchivoNuevo && (
-            <span className="text-[5px] font-bold text-gray-400">CLIC PARA REEMPLAZAR</span>
-          )}
         </div>
       </div>
     );
@@ -180,14 +181,14 @@ const MiPerfil = () => {
   );
 
   return (
-    <div className="min-h-screen p-6 md:p-10 bg-[#fcfaf7] animate-fade-in font-sans">
+    /* 🖼️ CAMBIO: bg-transparent para ver el logo institucional de fondo */
+    <div className="min-h-screen p-6 md:p-10 bg-transparent animate-fade-in font-sans">
       <div className="max-w-6xl mx-auto">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-400 font-black uppercase text-[10px] mb-8 hover:text-[#84bd00] transition bg-white px-4 py-2 rounded-full shadow-sm w-fit">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-400 font-black uppercase text-[10px] mb-8 hover:text-[#84bd00] transition bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm w-fit">
           <ArrowLeft size={16} /> Volver
         </button>
 
-        <form onSubmit={handleGuardar} className="bg-white/90 backdrop-blur-xl rounded-[3rem] shadow-2xl border border-white overflow-hidden">
-          
+        <form onSubmit={handleGuardar} className="bg-white/90 backdrop-blur-md rounded-[3rem] shadow-2xl border border-white overflow-hidden">
           <div className="bg-[#1a3a5f] p-10 text-white flex items-center justify-between">
             <div className="flex items-center gap-6">
               <div className="bg-white/10 p-4 rounded-3xl"><Briefcase size={40} /></div>
@@ -202,8 +203,6 @@ const MiPerfil = () => {
           </div>
 
           <div className="p-10 space-y-12">
-            
-            {/* SECCIÓN 1: DATOS MODIFICABLES */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-1">
                 <label className="text-[9px] font-black text-gray-400 uppercase ml-4">Nombre Completo</label>
@@ -238,7 +237,6 @@ const MiPerfil = () => {
               </div>
             </div>
 
-            {/* SECCIÓN 2: CARGA REAL DE DOCUMENTACIÓN */}
             <div className="p-8 bg-gray-50/50 rounded-[3.5rem] border border-gray-100 shadow-inner">
               <div className="flex items-center gap-3 mb-8 border-b pb-4">
                 <UploadCloud size={20} className="text-[#84bd00]"/>
@@ -255,15 +253,14 @@ const MiPerfil = () => {
               </div>
             </div>
 
-            {/* SECCIÓN 3: SEGURIDAD */}
             <div className="p-8 bg-blue-50/30 rounded-[3rem] border border-blue-100 space-y-6">
               <div className="flex items-center gap-3 text-blue-600 font-black">
                 <Key size={20}/>
                 <h3 className="text-[10px] font-black uppercase tracking-widest">Seguridad de la Cuenta</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <input type="password" placeholder="Nueva Clave" className="p-5 bg-white rounded-2xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" onChange={e => setPerfil({...perfil, password: e.target.value})} />
-                <input type="password" placeholder="Confirmar Clave" className="p-5 bg-white rounded-2xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" onChange={e => setPerfil({...perfil, repetir_password: e.target.value})} />
+                <input type="password" value={perfil.password} placeholder="Nueva Clave" className="p-5 bg-white rounded-2xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" onChange={e => setPerfil({...perfil, password: e.target.value})} />
+                <input type="password" value={perfil.repetir_password} placeholder="Confirmar Clave" className="p-5 bg-white rounded-2xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" onChange={e => setPerfil({...perfil, repetir_password: e.target.value})} />
               </div>
             </div>
 

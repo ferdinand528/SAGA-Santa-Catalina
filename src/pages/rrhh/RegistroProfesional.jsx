@@ -9,6 +9,7 @@ import {
 const RegistroProfesional = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true); // 👈 Estado para la validación inicial
   
   const [formData, setFormData] = useState({
     nombre_completo: '', 
@@ -22,8 +23,34 @@ const RegistroProfesional = () => {
     celular: ''
   });
 
-  // Corregido "Coordicacion" por "Coordinación" y mantenemos el resto
-  const cargosRaw = ["Psicopedagogía", "Fonoaudiología", "Coordinación", "Nutrición", "Administración", "Docencia", "Kinesiología"];
+  // 🛡️ RESTRICCIÓN DE SEGURIDAD: Solo el Director puede estar aquí
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { navigate('/login'); return; }
+
+        const { data: p } = await supabase
+          .from('perfiles')
+          .select('rol')
+          .eq('id', user.id)
+          .single();
+
+        if (p?.rol?.toLowerCase() !== 'director') {
+          // Si no es director, lo sacamos de aquí
+          navigate('/personal');
+        } else {
+          // Si es director, permitimos ver el formulario
+          setCheckingAccess(false);
+        }
+      } catch (error) {
+        navigate('/personal');
+      }
+    };
+    checkAccess();
+  }, [navigate]);
+
+  const cargosRaw = ["Psicopedaga","Psicologa", "Fonoaudiologa", "Coordinación", "Nutrición", "Administración", "Docente/Auxiliar", "Kinesiología"];
   const listaCargos = [...cargosRaw].sort((a, b) => a.localeCompare('es'));
 
   const generarEmail = useCallback((nombre) => {
@@ -87,6 +114,9 @@ const RegistroProfesional = () => {
     }
   };
 
+  // Mientras verifica el rol, no mostramos nada para evitar el "flash" del formulario
+  if (checkingAccess) return null;
+
   return (
     <div className="min-h-screen p-6 md:p-10 bg-transparent font-sans text-gray-800 animate-fade-in">
       <div className="max-w-4xl mx-auto">
@@ -127,7 +157,6 @@ const RegistroProfesional = () => {
                 {listaCargos.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
 
-              {/* 🛡️ SELECCIÓN DE ROL: Añadido 'coordinacion' */}
               <select required className="w-full p-4 bg-gray-50/50 rounded-2xl font-bold border-none shadow-inner" value={formData.rol} onChange={(e) => setFormData({...formData, rol: e.target.value})}>
                 <option value="docente">Docente / Profesional</option>
                 <option value="director">Directivo</option>
