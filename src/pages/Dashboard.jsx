@@ -5,13 +5,14 @@ import { APP_CONFIG } from '../constants/config';
 import { 
   LogOut, Calendar, Users, BarChart3, 
   ClipboardList, Settings, DollarSign,
-  ShieldCheck, Loader2
+  ShieldCheck, Loader2, AlertTriangle, Clock 
 } from 'lucide-react';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [perfil, setPerfil] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [alertasAcceso, setAlertasAcceso] = useState([]);
 
   useEffect(() => {
     async function getPerfil() {
@@ -24,10 +25,34 @@ const Dashboard = () => {
         if (data) {
           setPerfil(data);
 
-          // 🛡️ REGISTRO DE AUDITORÍA: Guarda quién entró y cuándo
-          await supabase.from('logs_acceso').insert([
-            { perfil_id: data.id }
-          ]);
+          // 🛡️ REGISTRO DE AUDITORÍA ÚNICO POR SESIÓN
+          // Usamos sessionStorage para que el registro se realice solo una vez por pestaña/sesión
+          const sessionKey = `log_acceso_${data.id}`;
+          const yaRegistradoEnEstaSesion = sessionStorage.getItem(sessionKey);
+
+          if (!yaRegistradoEnEstaSesion) {
+            await supabase.from('logs_acceso').insert([
+              { perfil_id: data.id }
+            ]);
+            // Marcamos la sesión como registrada
+            sessionStorage.setItem(sessionKey, 'true');
+          }
+
+          // 🕵️ ANÁLISIS DE SEGURIDAD (Solo para el Director)
+          if (data.rol?.toLowerCase() === 'director') {
+            const { data: logs } = await supabase
+              .from('logs_acceso')
+              .select('*, perfiles(nombre_completo)')
+              .order('fecha_ingreso', { ascending: false })
+              .limit(10);
+
+            // Filtramos ingresos entre las 23:00 y las 06:00
+            const sospechosos = logs?.filter(log => {
+              const hora = new Date(log.fecha_ingreso).getHours();
+              return hora >= 23 || hora <= 6;
+            });
+            setAlertasAcceso(sospechosos || []);
+          }
         }
       } catch (err) { 
         console.error("Error en Dashboard:", err); 
@@ -41,25 +66,24 @@ const Dashboard = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.clear();
+    sessionStorage.clear(); // 👈 IMPORTANTE: Limpiamos la bandera para permitir un nuevo log al re-ingresar
     navigate('/', { replace: true });
   };
 
-  // 🛡️ NUEVA LÓGICA DE ROLES ESTANDARIZADA
   const rolUsuario = perfil?.rol?.toLowerCase();
-  const esDirector = rolUsuario === 'director'; // Súper Usuario
+  const esDirector = rolUsuario === 'director'; 
   const esGestion = ['director', 'administrador', 'coordinacion'].includes(rolUsuario);
 
   if (loading) return (
     <div className="h-screen flex flex-col items-center justify-center bg-transparent">
       <Loader2 className="animate-spin text-[#84bd00] mb-4" size={32} />
       <p className="font-black text-gray-400 uppercase text-[10px] tracking-widest">
-        Sincronizando {APP_CONFIG.sistema} v3.3...
+        Sincronizando {APP_CONFIG.sistema} v4.2...
       </p>
     </div>
   );
 
   return (
-    /* 🖼️ CAMBIO: bg-transparent para mostrar el logo de fondo */
     <div className="min-h-screen p-6 md:p-10 flex flex-col animate-fade-in bg-transparent">
       
       <div className="flex-grow max-w-7xl mx-auto w-full">
@@ -82,10 +106,30 @@ const Dashboard = () => {
           </button>
         </header>
 
-        {/* GRILLA DE MÓDULOS FILTRADA */}
+        {/* 🚨 BLOQUE DE ALERTA DE SEGURIDAD (Solo Director) */}
+        {esDirector && alertasAcceso.length > 0 && (
+          <div className="mb-8 bg-red-600 text-white p-6 rounded-[2rem] shadow-xl shadow-red-100 flex flex-col md:flex-row items-center justify-between gap-4 animate-pulse">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/20 p-3 rounded-2xl">
+                <AlertTriangle size={24}/>
+              </div>
+              <div>
+                <h3 className="font-black uppercase text-xs tracking-widest">Alerta de Seguridad</h3>
+                <p className="text-[10px] font-bold opacity-80 uppercase">Se detectaron ingresos en horario crítico (Madrugada).</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => navigate('/reporte-accesos')}
+              className="bg-white text-red-600 px-6 py-3 rounded-xl font-black uppercase text-[9px] tracking-widest hover:bg-black hover:text-white transition-all"
+            >
+              Revisar Auditoría
+            </button>
+          </div>
+        )}
+
+        {/* GRILLA DE MÓDULOS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-10">
           
-          {/* Módulo Alumnos (Adaptado por Rol) */}
           <div onClick={() => navigate('/legajos')} className="bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer group border border-white">
             <div className="bg-[#84bd00] w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-green-100 group-hover:scale-110 transition-transform"><Users size={28}/></div>
             <h2 className="text-xl font-black text-[#1a3a5f] uppercase tracking-tighter">
@@ -96,31 +140,26 @@ const Dashboard = () => {
             </p>
           </div>
 
-          {/* Módulo Agenda */}
           <div onClick={() => navigate('/calendario')} className="bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer group border border-white">
             <div className="bg-sky-500 w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-sky-100 group-hover:scale-110 transition-transform"><Calendar size={28}/></div>
             <h2 className="text-xl font-black text-sky-600 uppercase tracking-tighter">Agenda</h2>
             <p className="text-gray-400 text-[10px] font-bold uppercase mt-1">Turnos y Terapias</p>
           </div>
 
-          {/* Módulo Mi Cuenta */}
           <div onClick={() => navigate('/mi-perfil')} className="bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer group border border-white">
             <div className="bg-gray-500 w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-gray-100 group-hover:scale-110 transition-transform"><Settings size={28}/></div>
             <h2 className="text-xl font-black text-gray-600 uppercase tracking-tighter">Mi Cuenta</h2>
             <p className="text-gray-400 text-[10px] font-bold uppercase mt-1">Seguridad y Perfil</p>
           </div>
 
-          {/* 🛡️ SECCIÓN TESORERÍA: SOLO DIRECTOR */}
           {esDirector && (
             <div onClick={() => navigate('/gestion-aranceles')} className="relative bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer group border border-white">
-              <div className="absolute top-8 right-8 bg-[#84bd00] text-white text-[7px] font-black px-2 py-1 rounded-md tracking-tighter uppercase">PV 2 Masivo</div>
               <div className="bg-emerald-500 w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-emerald-100 group-hover:scale-110 transition-transform"><DollarSign size={28}/></div>
               <h2 className="text-xl font-black text-emerald-600 uppercase tracking-tighter">Tesorería</h2>
-              <p className="text-gray-400 text-[10px] font-bold uppercase mt-1">Lotes ARCA y Cobranzas</p>
+              <p className="text-gray-400 text-[10px] font-bold uppercase mt-1">Ingresos y Balances</p>
             </div>
           )}
 
-          {/* 🛡️ SECCIÓN PERSONAL: SOLO DIRECTOR */}
           {esDirector && (
             <div onClick={() => navigate('/personal')} className="bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer group border border-white">
               <div className="bg-indigo-500 w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-indigo-100 group-hover:scale-110 transition-transform"><ClipboardList size={28}/></div>
@@ -129,7 +168,6 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* SECCIÓN REPORTES: TODA LA GESTIÓN (Internamente el menú filtrará qué ven) */}
           {esGestion && (
             <div onClick={() => navigate('/reportes')} className="bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer group border border-white">
               <div className="bg-red-500 w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-red-100 group-hover:scale-110 transition-transform"><BarChart3 size={28}/></div>
@@ -143,7 +181,7 @@ const Dashboard = () => {
       <footer className="mt-auto py-6 text-center">
         <div className="bg-white/40 backdrop-blur-sm inline-block px-8 py-3 rounded-full border border-white/20 shadow-sm">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">
-            {APP_CONFIG.sistema} <span className="text-[#84bd00]">v3.3</span> <span className="mx-3 text-[#84bd00] font-black">•</span> {APP_CONFIG.institucion}
+            {APP_CONFIG.sistema} <span className="text-[#84bd00]">v4.2</span> • {APP_CONFIG.institucion}
           </p>
         </div>
       </footer>
