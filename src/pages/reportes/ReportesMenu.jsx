@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase'; 
 import { 
-  ArrowLeft, FileWarning, ClipboardCheck, 
-  DollarSign, Users, HeartPulse, Loader2 
-} from 'lucide-react';
+  FileText, Users, DollarSign, 
+  Calendar, Activity, ShieldCheck, 
+  FileWarning, ClipboardCheck, HeartPulse, 
+  Loader2, ArrowLeft 
+} from 'lucide-react'; // 👈 IMPORTACIONES COMPLETAS v3.8
 
 const ReportesMenu = () => {
   const navigate = useNavigate();
@@ -32,9 +34,9 @@ const ReportesMenu = () => {
     obtenerPerfil();
   }, []);
 
-  // 🛡️ NUEVA LÓGICA DE PERMISOS AJUSTADA
+  // 🛡️ LÓGICA DE PERMISOS
   const rolUsuario = perfil?.rol?.toLowerCase();
-  const esDirector = rolUsuario === 'director'; // Súper Usuario
+  const esDirector = rolUsuario === 'director'; 
   const esGestionAlumnos = ['director', 'administrador', 'coordinacion'].includes(rolUsuario);
 
   const menuItems = [
@@ -45,7 +47,16 @@ const ReportesMenu = () => {
       path: "/reporte-legajos",
       color: "bg-red-500",
       shadow: "shadow-red-100",
-      ver: esDirector // 👈 SOLO DIRECTOR
+      ver: esDirector 
+    },
+    {
+      title: "Auditoría de Accesos",
+      desc: "Historial de entradas del personal",
+      icon: <ShieldCheck size={28} />,
+      path: "/reporte-accesos",
+      color: "bg-slate-700",
+      shadow: "shadow-slate-100",
+      ver: esDirector 
     },
     {
       title: "Auditoría Legajos Alumnos",
@@ -54,7 +65,7 @@ const ReportesMenu = () => {
       path: "/reporte-legajos-alumnos",
       color: "bg-indigo-600",
       shadow: "shadow-indigo-100",
-      ver: esGestionAlumnos // 👈 DIRECTOR, ADMIN Y COORD
+      ver: esGestionAlumnos 
     },
     {
       title: "Reporte de Cobranzas",
@@ -63,7 +74,7 @@ const ReportesMenu = () => {
       path: "/reportes-caja",
       color: "bg-emerald-500",
       shadow: "shadow-emerald-100",
-      ver: esDirector // 👈 SOLO DIRECTOR
+      ver: esDirector 
     },
     {
       title: "Asistencia Mensual",
@@ -72,7 +83,7 @@ const ReportesMenu = () => {
       path: "/reportes-asistencia",
       color: "bg-blue-500",
       shadow: "shadow-blue-100",
-      ver: true // 👈 TODOS (Incluye Docentes)
+      ver: true 
     },
     {
       title: "Censo de Obra Social",
@@ -81,11 +92,10 @@ const ReportesMenu = () => {
       path: "/censo-obra-social",
       color: "bg-purple-600",
       shadow: "shadow-purple-100",
-      ver: esGestionAlumnos // 👈 DIRECTOR, ADMIN Y COORD
+      ver: esGestionAlumnos 
     }
   ];
 
-  // Filtramos la lista basándonos en la propiedad 'ver'
   const itemsVisibles = menuItems.filter(item => item.ver);
 
   if (loading) return (

@@ -18,17 +18,26 @@ const Dashboard = () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { navigate('/'); return; }
+
         const { data } = await supabase.from('perfiles').select('*').eq('id', user.id).single();
-        setPerfil(data);
+        
+        if (data) {
+          setPerfil(data);
+
+          // 🛡️ REGISTRO DE AUDITORÍA: Guarda quién entró y cuándo
+          await supabase.from('logs_acceso').insert([
+            { perfil_id: data.id }
+          ]);
+        }
       } catch (err) { 
-        console.error(err); 
+        console.error("Error en Dashboard:", err); 
       } finally { 
         setLoading(false); 
       }
     }
     getPerfil();
   }, [navigate]);
-
+  
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.clear();

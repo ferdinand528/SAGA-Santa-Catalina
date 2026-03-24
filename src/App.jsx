@@ -34,6 +34,8 @@ import ReporteLegajosAlumnos from './pages/reportes/ReporteLegajosAlumnos';
 import ReporteCaja from './pages/reportes/ReporteCaja';
 import ReporteAsistencia from './pages/reportes/ReporteAsistencia';
 import CensoObraSocial from './pages/reportes/CensoObraSocial'; 
+import ReporteAccesos from './pages/reportes/ReporteAccesos';
+
 
 function App() {
   return (
@@ -89,6 +91,7 @@ function App() {
             <Route path="/reportes-caja" element={<ReporteCaja />} />
             <Route path="/reportes-asistencia" element={<ReporteAsistencia />} />
             <Route path="/censo-obra-social" element={<CensoObraSocial />} /> 
+            <Route path="/reporte-accesos" element={<ReporteAccesos />} />
           </Routes>
         </div>
       </div>
