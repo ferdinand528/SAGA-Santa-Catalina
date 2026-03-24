@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, DollarSign, CheckCircle, Clock, ArrowLeft, Receipt } from 'lucide-react';
+import { Search, DollarSign, CheckCircle, Clock, ArrowLeft, Receipt, Loader2, TrendingUp, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const ListaCobranzas = () => {
@@ -8,6 +8,28 @@ const ListaCobranzas = () => {
   const [pagos, setPagos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
+  const [perfil, setPerfil] = useState(null); // 👈 Para validar el rol
+
+  // 🛡️ RESTRICCIÓN DE SEGURIDAD: Solo el Director accede a Tesorería
+  useEffect(() => {
+    const verificarAcceso = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { navigate('/'); return; }
+
+        const { data } = await supabase.from('perfiles').select('rol').eq('id', user.id).single();
+        
+        if (data?.rol?.toLowerCase() !== 'director') {
+          alert("Acceso denegado: Esta sección es exclusiva de la Dirección.");
+          navigate('/dashboard');
+        }
+        setPerfil(data);
+      } catch (error) {
+        navigate('/dashboard');
+      }
+    };
+    verificarAcceso();
+  }, [navigate]);
 
   useEffect(() => {
     cargarDatos();
@@ -16,7 +38,6 @@ const ListaCobranzas = () => {
   async function cargarDatos() {
     try {
       setLoading(true);
-      // CONSULTA CORREGIDA: Usamos 'apellido', 'nombre' y 'dni' que son tus columnas reales
       const { data, error } = await supabase
         .from('pagos')
         .select(`
@@ -39,7 +60,18 @@ const ListaCobranzas = () => {
     }
   }
 
-  // Filtrado ajustado para buscar en la combinación de apellido y nombre
+  // 📈 LÓGICA DE BALANCE GENERAL (Mes y Año)
+  const mesActual = new Date().getMonth() + 1;
+  const anioActual = new Date().getFullYear();
+
+  const balanceMensual = pagos
+    .filter(p => Number(p.mes_facturado) === mesActual && Number(p.anio_facturado) === anioActual)
+    .reduce((acc, curr) => acc + (Number(curr.monto_total) || 0), 0);
+
+  const balanceAnual = pagos
+    .filter(p => Number(p.anio_facturado) === anioActual)
+    .reduce((acc, curr) => acc + (Number(curr.monto_total) || 0), 0);
+
   const filtrados = pagos.filter(p => {
     const nombreCompleto = `${p.alumnos?.apellido} ${p.alumnos?.nombre}`.toLowerCase();
     return nombreCompleto.includes(busqueda.toLowerCase());
@@ -47,13 +79,14 @@ const ListaCobranzas = () => {
 
   if (loading) return (
     <div className="h-screen flex items-center justify-center font-black text-[#84bd00] animate-pulse uppercase">
-      Sincronizando Caja Santa Catalina...
+      <Loader2 className="animate-spin mr-3" /> Sincronizando Caja Santa Catalina...
     </div>
   );
 
   return (
     <div className="min-h-screen p-6 md:p-12 bg-[#fcfaf7] font-sans text-[#1a3a5f]">
       <div className="max-w-7xl mx-auto">
+        
         <header className="flex flex-col md:flex-row justify-between items-start mb-12 gap-6">
           <div>
             <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-gray-400 font-black uppercase text-[10px] mb-4 hover:text-[#1a3a5f] transition">
@@ -62,16 +95,40 @@ const ListaCobranzas = () => {
             <h1 className="text-6xl font-black tracking-tighter uppercase leading-none">
               Control <span className="text-[#84bd00]">Cobranzas</span>
             </h1>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2 italic font-black">
-              I.A.D. SANTA CATALINA • TESORERÍA v3.7
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2 italic">
+              I.A.D. SANTA CATALINA • TESORERÍA v3.8
             </p>
           </div>
-          <button 
-            onClick={() => navigate('/generar-facturas')}
-            className="bg-[#1a3a5f] text-white px-8 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-[#84bd00] transition-all flex items-center gap-3"
-          >
-            <Receipt size={20}/> GENERAR LOTE MENSUAL
-          </button>
+
+          {/* 📊 INDICADORES DE BALANCE GENERAL (Solo Director) */}
+          <div className="flex flex-wrap gap-4">
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-white flex items-center gap-4 min-w-[200px]">
+              <div className="bg-emerald-500 text-white p-3 rounded-2xl shadow-lg shadow-emerald-100">
+                <TrendingUp size={20} />
+              </div>
+              <div>
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none">Recaudación Mes</p>
+                <p className="text-xl font-black text-emerald-600 mt-1 font-mono">${balanceMensual.toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="bg-[#1a3a5f] p-6 rounded-3xl shadow-xl flex items-center gap-4 min-w-[200px]">
+              <div className="bg-white/10 text-[#84bd00] p-3 rounded-2xl">
+                <BarChart3 size={20} />
+              </div>
+              <div>
+                <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">Total Anual</p>
+                <p className="text-xl font-black text-white mt-1 font-mono">${balanceAnual.toLocaleString()}</p>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => navigate('/generar-facturas')}
+              className="bg-[#1a3a5f] text-white px-8 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-[#84bd00] transition-all flex items-center gap-3"
+            >
+              <Receipt size={20}/> GENERAR LOTE MENSUAL
+            </button>
+          </div>
         </header>
 
         <div className="relative mb-10">
@@ -103,7 +160,7 @@ const ListaCobranzas = () => {
                     <p className="text-[9px] font-bold text-gray-400 uppercase">DNI: {p.alumnos?.dni}</p>
                   </td>
                   <td className="p-8 font-bold text-xs">{p.mes_facturado}/{p.anio_facturado}</td>
-                  <td className="p-8 font-black text-sm">$ {p.monto_total?.toLocaleString()}</td>
+                  <td className="p-8 font-black text-sm text-[#1a3a5f] font-mono">$ {p.monto_total?.toLocaleString()}</td>
                   <td className="p-8">
                     <span className={`px-4 py-2 rounded-full text-[9px] font-black uppercase flex items-center gap-2 w-fit ${p.estado === 'pagado' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
                       {p.estado === 'pagado' ? <CheckCircle size={14}/> : <Clock size={14}/>} {p.estado}

@@ -3,7 +3,8 @@ import { supabase } from '../../lib/supabase';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Save, DollarSign, 
-  Loader2, History, CheckCircle2, Info, CreditCard 
+  Loader2, History, CheckCircle2, Info, CreditCard,
+  TrendingUp, Activity 
 } from 'lucide-react';
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -18,6 +19,9 @@ const RegistroPagoAlumno = () => {
   const [historial, setHistorial] = useState([]);
   const [anioFiltro, setAnioFiltro] = useState(new Date().getFullYear());
   
+  // NUEVO: Estado para Balance General (Solo visible para Director)
+  const [balanceGral, setBalanceGral] = useState({ mensual: 0, anual: 0 });
+  
   const [form, setForm] = useState({
     mes: MESES[new Date().getMonth()],
     anio: new Date().getFullYear(),
@@ -25,12 +29,35 @@ const RegistroPagoAlumno = () => {
     metodo_pago: 'Efectivo'
   });
 
-  // 1. DEFINICIÓN DE FUNCIÓN (Modificado select para usar columnas reales)
+  // 🛡️ RESTRICCIÓN DE SEGURIDAD: Solo el Director puede operar Tesorería
+  useEffect(() => {
+    const verificarAcceso = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { navigate('/'); return; }
+
+        const { data: perfil } = await supabase
+          .from('perfiles')
+          .select('rol')
+          .eq('id', user.id)
+          .single();
+
+        if (perfil?.rol?.toLowerCase() !== 'director') {
+          alert("Acceso Restringido: Sección exclusiva de Dirección.");
+          navigate('/dashboard');
+        }
+      } catch (error) {
+        navigate('/dashboard');
+      }
+    };
+    verificarAcceso();
+  }, [navigate]);
+
   const fetchDatos = useCallback(async () => {
     if (!alumnoId) return;
     
     try {
-      // ⚠️ CORRECCIÓN: Usamos 'dni' y 'monto_cuota' según tu Supabase
+      // 1. Datos del Alumno
       const { data: alu } = await supabase
         .from('alumnos')
         .select('nombre, apellido, dni, monto_cuota') 
@@ -39,10 +66,10 @@ const RegistroPagoAlumno = () => {
 
       if (alu) {
         setAlumno(alu);
-        // Autocompletar monto usando monto_cuota
         setForm(prev => ({ ...prev, monto: prev.monto || alu.monto_cuota }));
       }
 
+      // 2. Historial del Alumno
       const { data: pagos } = await supabase
         .from('pagos')
         .select('*')
@@ -51,12 +78,32 @@ const RegistroPagoAlumno = () => {
         .order('fecha_registro', { ascending: false });
       
       setHistorial(pagos || []);
+
+      // 📊 NUEVO: Cálculo de Balance General Institucional
+      const { data: todosLosPagos } = await supabase
+        .from('pagos')
+        .select('monto, mes, anio');
+
+      if (todosLosPagos) {
+        // Balance del mes seleccionado en el formulario
+        const mensual = todosLosPagos
+          .filter(p => p.mes === form.mes && p.anio === Number(form.anio))
+          .reduce((acc, curr) => acc + Number(curr.monto), 0);
+        
+        // Balance del año seleccionado
+        const anual = todosLosPagos
+          .filter(p => p.anio === Number(form.anio))
+          .reduce((acc, curr) => acc + Number(curr.monto), 0);
+
+        setBalanceGral({ mensual, anual });
+      }
+
     } catch (err) { 
       console.error("Error en Tesorería:", err); 
     } finally { 
       setFetching(false); 
     }
-  }, [alumnoId, anioFiltro]);
+  }, [alumnoId, anioFiltro, form.mes, form.anio]);
 
   useEffect(() => {
     fetchDatos();
@@ -68,7 +115,6 @@ const RegistroPagoAlumno = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // ⚠️ INSERT: Aseguramos que el monto se guarde como número
       const { error } = await supabase.from('pagos').insert([{
         alumno_id: alumnoId,
         ...form,
@@ -96,122 +142,147 @@ const RegistroPagoAlumno = () => {
 
   return (
     <div className="min-h-screen p-6 md:p-10 bg-transparent animate-fade-in font-sans">
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10">
+      <div className="max-w-6xl mx-auto">
         
-        {/* COLUMNA FORMULARIO DE COBRO */}
-        <div className="space-y-6">
-          <button onClick={() => navigate('/cobranzas')} className="flex items-center gap-2 text-gray-400 font-black uppercase text-[10px] mb-4 hover:text-emerald-600 transition">
-            <ArrowLeft size={16} /> Volver a Cobranzas
-          </button>
-
-          <form onSubmit={handlePago} className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
-            <div className="bg-emerald-600 p-8 text-white flex justify-between items-start">
-              <div>
-                <h2 className="text-2xl font-black uppercase tracking-tighter leading-none">Registrar Cobro</h2>
-                <p className="text-emerald-100 text-[10px] font-black uppercase tracking-widest mt-2 italic">
-                   {alumno?.apellido}, {alumno?.nombre} • DNI: {alumno?.dni}
-                </p>
-              </div>
-              <div className="bg-white/20 p-4 rounded-2xl border border-white/30 backdrop-blur-sm">
-                <CreditCard size={24}/>
-              </div>
+        {/* 📊 NUEVO: HEADER DE BALANCES GENERALES */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="bg-white/90 backdrop-blur-md p-6 rounded-[2rem] border border-white shadow-sm flex items-center gap-5">
+            <div className="bg-emerald-500 text-white p-4 rounded-2xl shadow-lg shadow-emerald-100">
+              <TrendingUp size={24}/>
             </div>
-
-            <div className="p-10 space-y-8">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-300 uppercase ml-2 tracking-widest">Período Mensual</label>
-                  <select className="w-full p-4 bg-gray-50 rounded-2xl font-black text-xs outline-none border border-transparent focus:border-emerald-200 uppercase" value={form.mes} onChange={e => setForm({...form, mes: e.target.value})}>
-                    {MESES.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-300 uppercase ml-2 tracking-widest">Ejercicio Anual</label>
-                  <input type="number" className="w-full p-4 bg-gray-50 rounded-2xl font-black text-xs outline-none border border-transparent focus:border-emerald-200" value={form.anio} onChange={e => setForm({...form, anio: e.target.value})} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-300 uppercase ml-2 tracking-widest">Monto a Cobrar ($)</label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={16} />
-                    <input required type="number" className="w-full pl-10 p-4 bg-gray-50 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-emerald-50" value={form.monto} onChange={e => setForm({...form, monto: e.target.value})} />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-300 uppercase ml-2 tracking-widest">Medio de Pago</label>
-                  <select 
-                    className="w-full p-4 bg-gray-50 rounded-2xl font-black text-xs outline-none border border-transparent focus:border-emerald-200 uppercase"
-                    value={form.metodo_pago}
-                    onChange={e => setForm({...form, metodo_pago: e.target.value})}
-                  >
-                    {METODOS_PAGO.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="bg-emerald-50/30 border border-emerald-100 p-6 rounded-3xl flex items-center justify-between shadow-inner">
-                <div className="flex items-center gap-3">
-                  <Info size={16} className="text-emerald-500"/>
-                  <div>
-                    <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest leading-none">Monto sugerido</p>
-                    <p className="text-[8px] font-bold text-gray-400 uppercase mt-1 italic tracking-tighter">Corresponde a la cuota base</p>
-                  </div>
-                </div>
-                <p className="text-2xl font-black text-emerald-600 tracking-tighter">
-                  ${alumno?.monto_cuota || '0'}
-                </p>
-              </div>
-
-              <button disabled={loading} className="w-full bg-emerald-600 text-white p-6 rounded-[2rem] font-black uppercase text-[11px] tracking-widest shadow-xl shadow-emerald-100 hover:bg-gray-900 transition-all flex items-center justify-center gap-3">
-                {loading ? <Loader2 className="animate-spin" /> : <Save size={20}/>}
-                {loading ? "PROCESANDO..." : "Confirmar Ingreso v3.8"}
-              </button>
+            <div>
+              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Balance General {form.mes}</p>
+              <p className="text-2xl font-black text-emerald-600 tracking-tighter">${balanceGral.mensual.toLocaleString()}</p>
             </div>
-          </form>
-        </div>
-
-        {/* COLUMNA HISTORIAL */}
-        <div className="space-y-6">
-          <div className="bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] border border-gray-100 shadow-sm min-h-[500px]">
-            <div className="flex justify-between items-center mb-12">
-              <div className="flex items-center gap-3">
-                <History size={20} className="text-gray-300"/>
-                <h3 className="text-[10px] font-black text-[#1a3a5f] uppercase tracking-[0.2em]">Registro Histórico</h3>
-              </div>
-              <select className="p-3 bg-gray-50 rounded-2xl text-[10px] font-black uppercase border-none outline-none cursor-pointer" value={anioFiltro} onChange={e => setAnioFiltro(e.target.value)}>
-                {[2024, 2025, 2026].map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
+          </div>
+          <div className="bg-[#1a3a5f] p-6 rounded-[2rem] shadow-xl flex items-center gap-5">
+            <div className="bg-white/10 text-[#84bd00] p-4 rounded-2xl">
+              <Activity size={24}/>
             </div>
-
-            <div className="space-y-4">
-              {historial.length > 0 ? historial.map(pago => (
-                <div key={pago.id} className="flex items-center justify-between p-6 bg-white rounded-[2rem] border border-gray-50 hover:border-emerald-100 shadow-sm transition-all group">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-emerald-50 p-3 rounded-2xl text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-all shadow-inner">
-                      <CheckCircle2 size={18}/>
-                    </div>
-                    <div>
-                      <p className="text-xs font-black text-gray-800 uppercase leading-none tracking-tighter">{pago.mes} {pago.anio}</p>
-                      <p className="text-[8px] font-black text-emerald-500 uppercase mt-2 bg-emerald-50 px-2 py-0.5 rounded-md inline-block tracking-widest italic">{pago.metodo_pago}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-black text-emerald-600 tracking-tighter">${pago.monto}</p>
-                  </div>
-                </div>
-              )) : (
-                <div className="py-24 text-center border-2 border-dashed border-gray-100 rounded-[3rem]">
-                  <DollarSign size={48} className="text-gray-100 mx-auto mb-4" />
-                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest italic">No hay registros de caja para {anioFiltro}</p>
-                </div>
-              )}
+            <div>
+              <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Recaudación Anual {form.anio}</p>
+              <p className="text-2xl font-black text-white tracking-tighter">${balanceGral.anual.toLocaleString()}</p>
             </div>
           </div>
         </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+          
+          {/* COLUMNA FORMULARIO DE COBRO */}
+          <div className="space-y-6">
+            <button onClick={() => navigate('/cobranzas')} className="flex items-center gap-2 text-gray-400 font-black uppercase text-[10px] mb-4 hover:text-emerald-600 transition bg-white/50 px-4 py-2 rounded-full shadow-sm w-fit">
+              <ArrowLeft size={16} /> Volver a Cobranzas
+            </button>
+
+            <form onSubmit={handlePago} className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
+              <div className="bg-emerald-600 p-8 text-white flex justify-between items-start">
+                <div>
+                  <h2 className="text-2xl font-black uppercase tracking-tighter leading-none">Registrar Cobro</h2>
+                  <p className="text-emerald-100 text-[10px] font-black uppercase tracking-widest mt-2 italic">
+                     {alumno?.apellido}, {alumno?.nombre} • DNI: {alumno?.dni}
+                  </p>
+                </div>
+                <div className="bg-white/20 p-4 rounded-2xl border border-white/30 backdrop-blur-sm">
+                  <CreditCard size={24}/>
+                </div>
+              </div>
+
+              <div className="p-10 space-y-8">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-300 uppercase ml-2 tracking-widest">Período Mensual</label>
+                    <select className="w-full p-4 bg-gray-50 rounded-2xl font-black text-xs outline-none border border-transparent focus:border-emerald-200 uppercase" value={form.mes} onChange={e => setForm({...form, mes: e.target.value})}>
+                      {MESES.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-300 uppercase ml-2 tracking-widest">Ejercicio Anual</label>
+                    <input type="number" className="w-full p-4 bg-gray-50 rounded-2xl font-black text-xs outline-none border border-transparent focus:border-emerald-200" value={form.anio} onChange={e => setForm({...form, anio: e.target.value})} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-300 uppercase ml-2 tracking-widest">Monto a Cobrar ($)</label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={16} />
+                      <input required type="number" className="w-full pl-10 p-4 bg-gray-50 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-emerald-50" value={form.monto} onChange={e => setForm({...form, monto: e.target.value})} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-300 uppercase ml-2 tracking-widest">Medio de Pago</label>
+                    <select 
+                      className="w-full p-4 bg-gray-50 rounded-2xl font-black text-xs outline-none border border-transparent focus:border-emerald-200 uppercase"
+                      value={form.metodo_pago}
+                      onChange={e => setForm({...form, metodo_pago: e.target.value})}
+                    >
+                      {METODOS_PAGO.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="bg-emerald-50/30 border border-emerald-100 p-6 rounded-3xl flex items-center justify-between shadow-inner">
+                  <div className="flex items-center gap-3">
+                    <Info size={16} className="text-emerald-500"/>
+                    <div>
+                      <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest leading-none">Monto sugerido</p>
+                      <p className="text-[8px] font-bold text-gray-400 uppercase mt-1 italic tracking-tighter">Corresponde a la cuota base</p>
+                    </div>
+                  </div>
+                  <p className="text-2xl font-black text-emerald-600 tracking-tighter">
+                    ${alumno?.monto_cuota || '0'}
+                  </p>
+                </div>
+
+                <button disabled={loading} className="w-full bg-emerald-600 text-white p-6 rounded-[2rem] font-black uppercase text-[11px] tracking-widest shadow-xl shadow-emerald-100 hover:bg-gray-900 transition-all flex items-center justify-center gap-3">
+                  {loading ? <Loader2 className="animate-spin" /> : <Save size={20}/>}
+                  {loading ? "PROCESANDO..." : "Confirmar Ingreso v3.8"}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* COLUMNA HISTORIAL */}
+          <div className="space-y-6">
+            <div className="bg-white/80 backdrop-blur-md p-10 rounded-[2.5rem] border border-gray-100 shadow-sm min-h-[500px]">
+              <div className="flex justify-between items-center mb-12">
+                <div className="flex items-center gap-3">
+                  <History size={20} className="text-gray-300"/>
+                  <h3 className="text-[10px] font-black text-[#1a3a5f] uppercase tracking-[0.2em]">Registro Histórico</h3>
+                </div>
+                <select className="p-3 bg-gray-50 rounded-2xl text-[10px] font-black uppercase border-none outline-none cursor-pointer" value={anioFiltro} onChange={e => setAnioFiltro(e.target.value)}>
+                  {[2024, 2025, 2026].map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-4">
+                {historial.length > 0 ? historial.map(pago => (
+                  <div key={pago.id} className="flex items-center justify-between p-6 bg-white rounded-[2rem] border border-gray-50 hover:border-emerald-100 shadow-sm transition-all group">
+                    <div className="flex items-center gap-4">
+                      <div className="bg-emerald-50 p-3 rounded-2xl text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-all shadow-inner">
+                        <CheckCircle2 size={18}/>
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-gray-800 uppercase leading-none tracking-tighter">{pago.mes} {pago.anio}</p>
+                        <p className="text-[8px] font-black text-emerald-500 uppercase mt-2 bg-emerald-50 px-2 py-0.5 rounded-md inline-block tracking-widest italic">{pago.metodo_pago}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-black text-emerald-600 tracking-tighter">${pago.monto}</p>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="py-24 text-center border-2 border-dashed border-gray-100 rounded-[3rem]">
+                    <DollarSign size={48} className="text-gray-100 mx-auto mb-4" />
+                    <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest italic">No hay registros de caja para {anioFiltro}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   );
