@@ -7,7 +7,7 @@ import {
   ImageIcon, Save, Edit3, XCircle, Trash2 
 } from 'lucide-react';
 
-// --- 🪄 FUNCIÓN DE COMPRESIÓN (Definida fuera para evitar el ReferenceError) ---
+// --- 🪄 FUNCIÓN DE COMPRESIÓN ---
 const comprimirImagen = (archivo) => {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -53,6 +53,7 @@ const FichaAlumno = () => {
 
   // 🛡️ Lógica de Roles Estandarizada
   const rolUsuario = perfil?.rol?.toLowerCase();
+  const esDirector = rolUsuario === 'director'; 
   const esGestion = ['director', 'administrador', 'coordinacion'].includes(rolUsuario);
 
   const cargarEvoluciones = useCallback(async () => {
@@ -100,7 +101,7 @@ const FichaAlumno = () => {
     initFicha();
   }, [initFicha]);
 
-  // 🛡️ POLÍTICA DE LIMPIEZA: Borra de Storage y luego de la DB
+  // 🛡️ POLÍTICA DE LIMPIEZA
   const borrarEvolucion = async (evolucionId) => {
     const confirmar = window.confirm("¿Estás seguro? Se eliminará el registro y sus fotos permanentemente.");
     if (!confirmar) return;
@@ -123,7 +124,7 @@ const FichaAlumno = () => {
 
       await cargarEvoluciones();
     } catch (err) {
-      alert("Error en la limpieza: " + err.message);
+      alert("Error en la limpieza: No tienes permisos suficientes.");
     } finally {
       setSaving(false);
     }
@@ -165,20 +166,20 @@ const FichaAlumno = () => {
 
     setSaving(true); 
     const fotosComprimidas = [];
-    const nuevasPreviews = [];
+    const nuevasPreviews = []; // ✅ CORREGIDO: Sin espacios
 
     for (const file of files) {
       try {
-        const comprimida = await comprimirImagen(file); // 🪄 Ahora sí está definida
+        const comprimida = await comprimirImagen(file);
         fotosComprimidas.push(comprimida);
-        nuevasPreviews.push(URL.createObjectURL(comprimida));
+        nuevasPreviews.push(URL.createObjectURL(comprimida)); // ✅ CORREGIDO: Sin espacios
       } catch (e) {
         console.error("Error comprimiendo:", e);
       }
     }
 
     setFotos(prev => [...prev, ...fotosComprimidas]);
-    setPreviews(prev => [...prev, ...nuevasPreviews]);
+    setPreviews(prev => [...prev, ...nuevasPreviews]); // ✅ CORREGIDO: Sin espacios
     setSaving(false);
   };
 
@@ -226,7 +227,7 @@ const FichaAlumno = () => {
   if (loading) return (
     <div className="h-screen flex flex-col items-center justify-center bg-transparent">
       <Loader2 className="animate-spin text-blue-600 mb-4" size={32} />
-      <p className="font-black text-gray-400 uppercase text-[10px] tracking-widest">Sincronizando Legajo v3.3...</p>
+      <p className="font-black text-gray-400 uppercase text-[10px] tracking-widest">Sincronizando Legajo v4.2...</p>
     </div>
   );
 
@@ -311,8 +312,6 @@ const FichaAlumno = () => {
           
           <div className="space-y-12">
             {evoluciones.map((e) => {
-              const esPropio = e.profesional_id === perfil?.id;
-
               return (
                 <div key={e.id} className="relative pl-8 border-l-2 border-gray-100 pb-10 last:border-0 last:pb-0">
                   <div className="absolute -left-[9px] top-0 w-4 h-4 bg-white border-4 border-blue-500 rounded-full shadow-sm" />
@@ -324,7 +323,8 @@ const FichaAlumno = () => {
                     </div>
                     
                     <div className="flex items-center gap-4">
-                      {esPropio && (
+                      {/* 🗑️ EL BOTÓN SOLO APARECE SI SOS DIRECTOR */}
+                      {esDirector && (
                         <button 
                           onClick={() => borrarEvolucion(e.id)}
                           className="flex items-center gap-1 text-[9px] font-black text-red-500 uppercase bg-red-50 px-3 py-1 rounded-lg hover:bg-red-500 hover:text-white transition-all"
