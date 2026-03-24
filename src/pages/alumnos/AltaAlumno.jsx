@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from "../../lib/supabase";
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -16,26 +16,22 @@ const OBRAS_SOCIALES = [
 const AltaAlumno = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [perfil, setPerfil] = useState(null); // 👈 Para validar el rol
   const [otraObraSocial, setOtraObraSocial] = useState("");
   
   const [form, setForm] = useState({
-    // IDENTIDAD
     nombre: '', apellido: '', dni: '', fecha_nacimiento: '',
-    // ADMINISTRACIÓN Y FACTURACIÓN
     obra_social: 'IOSCOR', 
     fecha_vencimiento_cud: '', 
     monto_cuota: '', 
     tipo_factura: 'B', 
     condicion_iva: 'Consumidor Final',
-    // CLÍNICA
     patologia: '', medicacion: '',
-    // TUTOR (APELLIDO Y NOMBRE)
     tutor_nombre: '', 
     nombre_tutor_facturacion: '', 
     dni_tutor: '', 
     tutor_celular: '', 
     tutor_domicilio: '',
-    // CHECKLIST COMPLETO (14 ITEMS)
     doc_dni_alumno: false, doc_dni_tutor: false,
     doc_cuil_alumno: false, doc_cuil_tutor: false,
     doc_cud: false, doc_historia_clinica: false,
@@ -44,6 +40,20 @@ const AltaAlumno = () => {
     doc_permiso_transporte: false, doc_informe_evaluacion: false,
     doc_plan_tratamiento: false
   });
+
+  // 🛡️ OBTENER PERFIL AL CARGAR
+  useEffect(() => {
+    async function obtenerRol() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase.from('perfiles').select('rol').eq('id', user.id).single();
+        setPerfil(data);
+      }
+    }
+    obtenerRol();
+  }, []);
+
+  const esDirector = perfil?.rol?.toLowerCase() === 'director';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -56,7 +66,7 @@ const AltaAlumno = () => {
       };
       const { error } = await supabase.from('alumnos').insert([datosFinales]);
       if (error) throw error;
-      alert("Legajo Integral v3.1 registrado con éxito.");
+      alert("Legajo Integral registrado con éxito.");
       navigate('/legajos');
     } catch (err) {
       alert("Error: " + err.message);
@@ -82,7 +92,7 @@ const AltaAlumno = () => {
   return (
     <div className="min-h-screen p-6 md:p-10 bg-transparent animate-fade-in">
       <div className="max-w-6xl mx-auto">
-        <button onClick={() => navigate('/legajos')} className="flex items-center gap-2 text-gray-400 font-black uppercase text-[10px] mb-8 hover:text-[#84bd00] transition">
+        <button onClick={() => navigate('/legajos')} className="flex items-center gap-2 text-gray-400 font-black uppercase text-[10px] mb-8 hover:text-[#84bd00] transition bg-white/50 px-4 py-2 rounded-full">
           <ArrowLeft size={16} /> Volver a la Nómina
         </button>
 
@@ -91,7 +101,7 @@ const AltaAlumno = () => {
           <div className="bg-[#84bd00] p-8 text-white flex items-center gap-4">
             <UserPlus size={32} />
             <div>
-              <h2 className="text-2xl font-black uppercase tracking-tighter leading-none">Alta de Alumno - v3.1</h2>
+              <h2 className="text-2xl font-black uppercase tracking-tighter leading-none">Alta de Alumno - v3.4</h2>
               <p className="text-white/80 text-[10px] font-black uppercase tracking-widest mt-2">Santa Catalina • Legajo Integral Completo</p>
             </div>
           </div>
@@ -113,7 +123,6 @@ const AltaAlumno = () => {
                 </div>
               </div>
 
-              {/* TUTOR: APELLIDO Y NOMBRE */}
               <div className="space-y-4">
                 <h3 className="text-[10px] font-black text-[#1a3a5f] uppercase tracking-[0.2em] border-b pb-2 flex items-center gap-2">
                   <UserCheck size={14}/> Responsable Legal (Apellido y Nombre)
@@ -129,7 +138,7 @@ const AltaAlumno = () => {
               </div>
             </div>
 
-            {/* 2. CHECKLIST DE DOCUMENTACIÓN (MANTENIDO ÍNTEGRO) */}
+            {/* 2. CHECKLIST DE DOCUMENTACIÓN */}
             <div className="p-8 bg-gray-50/50 rounded-3xl border border-gray-100 shadow-inner">
               <div className="flex items-center gap-2 mb-6 border-b border-gray-200 pb-2">
                 <FileCheck size={16} className="text-[#84bd00]"/>
@@ -153,53 +162,61 @@ const AltaAlumno = () => {
               </div>
             </div>
 
-            {/* 3. ADMINISTRACIÓN Y CLÍNICA */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              <div className="p-8 bg-blue-50/30 rounded-3xl border border-blue-100 space-y-4">
-                <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
-                  <Receipt size={14}/> Cobertura y Facturación
-                </h3>
-                <div className="grid grid-cols-1 gap-4">
-                  <select className="w-full p-4 bg-white rounded-2xl font-bold text-sm border-none shadow-sm" value={form.obra_social} onChange={e => setForm({...form, obra_social: e.target.value})}>
-                    {OBRAS_SOCIALES.map(os => <option key={os} value={os}>{os}</option>)}
-                  </select>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-black text-red-500 uppercase ml-2">Venc. CUD</label>
-                      <input type="date" required className="w-full p-4 bg-white rounded-2xl font-bold text-sm border border-red-100 text-gray-500" onChange={e => setForm({...form, fecha_vencimiento_cud: e.target.value})} />
+            {/* 3. ADMINISTRACIÓN Y CLÍNICA (RESTRINGIDA) */}
+            <div className={`grid grid-cols-1 ${esDirector ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} gap-10`}>
+              
+              {/* 🛡️ SECCIÓN SENSIBLE: Solo para el Director */}
+              {esDirector && (
+                <div className="p-8 bg-blue-50/30 rounded-3xl border border-blue-100 space-y-4">
+                  <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+                    <Receipt size={14}/> Cobertura y Facturación
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <select className="w-full p-4 bg-white rounded-2xl font-bold text-sm border-none shadow-sm" value={form.obra_social} onChange={e => setForm({...form, obra_social: e.target.value})}>
+                      {OBRAS_SOCIALES.map(os => <option key={os} value={os}>{os}</option>)}
+                    </select>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-red-500 uppercase ml-2">Venc. CUD</label>
+                        {/* Se quita el 'required' para que no bloquee el form si está oculto para otros roles */}
+                        <input type="date" className="w-full p-4 bg-white rounded-2xl font-bold text-sm border border-red-100 text-gray-500" onChange={e => setForm({...form, fecha_vencimiento_cud: e.target.value})} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-green-600 uppercase ml-2 font-mono italic">Cuota Mensual ($)</label>
+                        <input 
+                          type="number" 
+                          step="0.01" 
+                          placeholder="0.00" 
+                          className="w-full p-4 bg-white rounded-2xl font-black text-sm border-2 border-green-100 text-green-700 outline-none" 
+                          onChange={e => setForm({...form, monto_cuota: e.target.value})} 
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-black text-green-600 uppercase ml-2 font-mono italic">Cuota Mensual ($)</label>
-                      <input 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="0.00" 
-                        className="w-full p-4 bg-white rounded-2xl font-black text-sm border-2 border-green-100 text-green-700 outline-none" 
-                        onChange={e => setForm({...form, monto_cuota: e.target.value})} 
-                      />
-                    </div>
+                    <select className="w-full p-4 bg-white rounded-2xl font-black text-[10px] text-blue-600 border border-blue-200 uppercase" onChange={e => setForm({...form, tipo_factura: e.target.value})}>
+                      <option value="B">Factura B (Consumidor Final)</option>
+                      <option value="A">Factura A (Resp. Inscripto)</option>
+                      <option value="M">Factura M</option>
+                      <option value="T">Factura T (Especial)</option>
+                    </select>
                   </div>
-                  <select className="w-full p-4 bg-white rounded-2xl font-black text-[10px] text-blue-600 border border-blue-200 uppercase" onChange={e => setForm({...form, tipo_factura: e.target.value})}>
-                    <option value="B">Factura B (Consumidor Final)</option>
-                    <option value="A">Factura A (Resp. Inscripto)</option>
-                    <option value="M">Factura M</option>
-                    <option value="T">Factura T (Especial)</option>
-                  </select>
                 </div>
-              </div>
+              )}
 
+              {/* SECCIÓN CLÍNICA: Visible para todos */}
               <div className="space-y-4">
                 <h3 className="text-[10px] font-black text-red-500 uppercase tracking-widest flex items-center gap-2">
                   <Activity size={14}/> Resumen Clínico
                 </h3>
-                <textarea placeholder="Patología / Diagnóstico" rows="3" className="w-full p-4 bg-red-50/20 border border-red-50 rounded-2xl font-bold text-sm outline-none" onChange={e => setForm({...form, patologia: e.target.value})} />
-                <textarea placeholder="Medicación y Esquema" rows="3" className="w-full p-4 bg-blue-50/20 border border-blue-50 rounded-2xl font-bold text-sm outline-none" onChange={e => setForm({...form, medicacion: e.target.value})} />
+                <div className={`grid grid-cols-1 ${!esDirector ? 'md:grid-cols-2' : ''} gap-4`}>
+                  <textarea placeholder="Patología / Diagnóstico" rows="3" className="w-full p-4 bg-red-50/20 border border-red-50 rounded-2xl font-bold text-sm outline-none" onChange={e => setForm({...form, patologia: e.target.value})} />
+                  <textarea placeholder="Medicación y Esquema" rows="3" className="w-full p-4 bg-blue-50/20 border border-blue-50 rounded-2xl font-bold text-sm outline-none" onChange={e => setForm({...form, medicacion: e.target.value})} />
+                </div>
               </div>
             </div>
 
             <button disabled={loading} className="w-full bg-[#84bd00] text-white p-7 rounded-3xl font-black uppercase tracking-[0.3em] shadow-xl hover:bg-[#1a3a5f] transition-all flex items-center justify-center gap-3 disabled:opacity-50">
               {loading ? <Loader2 className="animate-spin" /> : <Save size={22}/>}
-              {loading ? "PROCESANDO..." : "REGISTRAR LEGAJO INTEGRAL v3.1"}
+              {loading ? "PROCESANDO..." : "REGISTRAR LEGAJO INTEGRAL v3.4"}
             </button>
           </div>
         </form>

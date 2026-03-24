@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase'; // 👈 Añadido
+import { supabase } from '../../lib/supabase'; 
 import { 
   ArrowLeft, FileWarning, ClipboardCheck, 
   DollarSign, Users, HeartPulse, Loader2 
@@ -11,7 +11,6 @@ const ReportesMenu = () => {
   const [perfil, setPerfil] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 1. CARGAR ROL DEL USUARIO
   useEffect(() => {
     async function obtenerPerfil() {
       try {
@@ -33,9 +32,10 @@ const ReportesMenu = () => {
     obtenerPerfil();
   }, []);
 
-  // 🛡️ DEFINICIÓN DE PERMISOS (Incluye Coordinación)
+  // 🛡️ NUEVA LÓGICA DE PERMISOS AJUSTADA
   const rolUsuario = perfil?.rol?.toLowerCase();
-  const esGestion = ['director', 'administrador', 'coordinacion'].includes(rolUsuario);
+  const esDirector = rolUsuario === 'director'; // Súper Usuario
+  const esGestionAlumnos = ['director', 'administrador', 'coordinacion'].includes(rolUsuario);
 
   const menuItems = [
     {
@@ -45,7 +45,7 @@ const ReportesMenu = () => {
       path: "/reporte-legajos",
       color: "bg-red-500",
       shadow: "shadow-red-100",
-      soloGestion: true // 👈 Solo para Directivos/Admin/Coord
+      ver: esDirector // 👈 SOLO DIRECTOR
     },
     {
       title: "Auditoría Legajos Alumnos",
@@ -54,7 +54,7 @@ const ReportesMenu = () => {
       path: "/reporte-legajos-alumnos",
       color: "bg-indigo-600",
       shadow: "shadow-indigo-100",
-      soloGestion: true
+      ver: esGestionAlumnos // 👈 DIRECTOR, ADMIN Y COORD
     },
     {
       title: "Reporte de Cobranzas",
@@ -63,7 +63,7 @@ const ReportesMenu = () => {
       path: "/reportes-caja",
       color: "bg-emerald-500",
       shadow: "shadow-emerald-100",
-      soloGestion: true
+      ver: esDirector // 👈 SOLO DIRECTOR
     },
     {
       title: "Asistencia Mensual",
@@ -72,7 +72,7 @@ const ReportesMenu = () => {
       path: "/reportes-asistencia",
       color: "bg-blue-500",
       shadow: "shadow-blue-100",
-      soloGestion: false // 👈 Visible para todos
+      ver: true // 👈 TODOS (Incluye Docentes)
     },
     {
       title: "Censo de Obra Social",
@@ -81,12 +81,12 @@ const ReportesMenu = () => {
       path: "/censo-obra-social",
       color: "bg-purple-600",
       shadow: "shadow-purple-100",
-      soloGestion: true
+      ver: esGestionAlumnos // 👈 DIRECTOR, ADMIN Y COORD
     }
   ];
 
-  // Filtramos la lista según el rol
-  const itemsVisibles = menuItems.filter(item => !item.soloGestion || esGestion);
+  // Filtramos la lista basándonos en la propiedad 'ver'
+  const itemsVisibles = menuItems.filter(item => item.ver);
 
   if (loading) return (
     <div className="h-screen flex items-center justify-center bg-transparent">
@@ -108,7 +108,7 @@ const ReportesMenu = () => {
             Centro de <span className="text-[#84bd00]">Reportes</span>
           </h1>
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">
-            Instituto Santa Catalina • {esGestion ? 'Acceso Jerárquico v3.1' : 'Acceso Docente v3.1'}
+            Instituto Santa Catalina • {esDirector ? 'Modo Súper Usuario' : 'Acceso Restringido'}
           </p>
         </header>
 

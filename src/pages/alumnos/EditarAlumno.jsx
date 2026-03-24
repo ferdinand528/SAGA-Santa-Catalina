@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Save, Activity, CreditCard, 
   Loader2, UserCheck, FileCheck, Receipt, Edit3 
-} from 'lucide-react'; // <--- CORREGIDO: "lucide-react"
+} from 'lucide-react';
 
 const OBRAS_SOCIALES = [
   "IOSCOR", "PAMI", "OSDE", "CITY SALUD", "SWISS MEDICAL", 
@@ -18,6 +18,7 @@ const EditarAlumno = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [perfil, setPerfil] = useState(null); // 👈 Para validar el rol
   const [otraObraSocial, setOtraObraSocial] = useState("");
   
   const [form, setForm] = useState({
@@ -34,8 +35,16 @@ const EditarAlumno = () => {
   });
 
   useEffect(() => {
-    const fetchAlumno = async () => {
+    const fetchDatos = async () => {
       try {
+        // 🛡️ 1. Obtener rol del usuario actual
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: p } = await supabase.from('perfiles').select('rol').eq('id', user.id).single();
+          setPerfil(p);
+        }
+
+        // 2. Obtener datos del alumno
         const { data, error } = await supabase.from('alumnos').select('*').eq('id', id).single();
         if (error) throw error;
         if (data) {
@@ -52,8 +61,10 @@ const EditarAlumno = () => {
         setLoading(false);
       }
     };
-    fetchAlumno();
+    fetchDatos();
   }, [id, navigate]);
+
+  const esDirector = perfil?.rol?.toLowerCase() === 'director';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -65,7 +76,7 @@ const EditarAlumno = () => {
       };
       const { error } = await supabase.from('alumnos').update(datosFinales).eq('id', id);
       if (error) throw error;
-      alert("Legajo Integral v3.1 actualizado correctamente.");
+      alert("Legajo Integral v3.4 actualizado correctamente.");
       navigate('/legajos');
     } catch (err) {
       alert("Error en la actualización: " + err.message);
@@ -88,7 +99,7 @@ const EditarAlumno = () => {
 
   if (loading) return (
     <div className="h-screen flex items-center justify-center font-black text-[#1a3a5f] uppercase tracking-widest animate-pulse">
-      <Loader2 className="animate-spin mr-3 text-[#84bd00]" /> Sincronizando Legajo v3.1...
+      <Loader2 className="animate-spin mr-3 text-[#84bd00]" /> Sincronizando Legajo v3.4...
     </div>
   );
 
@@ -103,7 +114,7 @@ const EditarAlumno = () => {
           <div className="bg-[#1a3a5f] p-8 text-white flex items-center gap-4">
             <Edit3 size={32} />
             <div>
-              <h2 className="text-2xl font-black uppercase tracking-tighter leading-none">Editar Legajo - v3.1</h2>
+              <h2 className="text-2xl font-black uppercase tracking-tighter leading-none">Editar Legajo - v3.4</h2>
               <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mt-2">Alumno: {form.apellido}, {form.nombre}</p>
             </div>
           </div>
@@ -130,10 +141,7 @@ const EditarAlumno = () => {
                   <UserCheck size={14}/> Responsable Legal (Apellido y Nombre)
                 </h3>
                 <div className="space-y-3">
-                  <div className="relative">
-                    <input required value={form.nombre_tutor_facturacion} placeholder="APELLIDO Y NOMBRE DEL TUTOR" className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-sm outline-none border-2 border-transparent focus:border-[#1a3a5f]" onChange={e => setForm({...form, tutor_nombre: e.target.value.toUpperCase(), nombre_tutor_facturacion: e.target.value.toUpperCase()})} />
-                    <span className="absolute -top-2 right-4 bg-[#1a3a5f] text-white text-[7px] font-black px-2 py-0.5 rounded uppercase">Ej: VALLEJOS LAUREANO RAMON</span>
-                  </div>
+                  <input required value={form.nombre_tutor_facturacion} placeholder="APELLIDO Y NOMBRE DEL TUTOR" className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-sm outline-none border-2 border-transparent focus:border-[#1a3a5f]" onChange={e => setForm({...form, tutor_nombre: e.target.value.toUpperCase(), nombre_tutor_facturacion: e.target.value.toUpperCase()})} />
                   <div className="grid grid-cols-2 gap-4">
                     <input required value={form.dni_tutor} placeholder="DNI/CUIL TUTOR" className="p-4 bg-blue-50/50 border-2 border-blue-100 rounded-2xl font-black text-sm outline-none" onChange={e => setForm({...form, dni_tutor: e.target.value})} />
                     <input value={form.tutor_celular} placeholder="CELULAR" className="p-4 bg-gray-50 rounded-2xl font-bold text-sm outline-none" onChange={e => setForm({...form, tutor_celular: e.target.value})} />
@@ -143,7 +151,7 @@ const EditarAlumno = () => {
               </div>
             </div>
 
-            {/* 2. CONTROL DE DOCUMENTACIÓN FÍSICA (14 PUNTOS) */}
+            {/* 2. CONTROL DE DOCUMENTACIÓN FÍSICA */}
             <div className="p-8 bg-gray-50/50 rounded-3xl border border-gray-100 shadow-inner">
               <div className="flex items-center gap-2 mb-6 border-b border-gray-200 pb-2">
                 <FileCheck size={16} className="text-[#84bd00]"/>
@@ -167,54 +175,60 @@ const EditarAlumno = () => {
               </div>
             </div>
 
-            {/* 3. COBERTURA Y SALUD */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              <div className="p-8 bg-blue-50/30 rounded-3xl border border-blue-100 space-y-4">
-                <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
-                  <Receipt size={14}/> Cobertura y Facturación
-                </h3>
-                <div className="grid grid-cols-1 gap-4">
-                  <select className="w-full p-4 bg-white rounded-2xl font-bold text-sm border-none shadow-sm" value={form.obra_social} onChange={e => setForm({...form, obra_social: e.target.value})}>
-                    {OBRAS_SOCIALES.map(os => <option key={os} value={os}>{os}</option>)}
-                  </select>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-black text-red-500 uppercase ml-2">Venc. CUD</label>
-                      <input type="date" value={form.fecha_vencimiento_cud} required className="w-full p-4 bg-white rounded-2xl font-bold text-sm border border-red-100 text-gray-500" onChange={e => setForm({...form, fecha_vencimiento_cud: e.target.value})} />
+            {/* 3. COBERTURA Y SALUD (PROTEGIDO) */}
+            <div className={`grid grid-cols-1 ${esDirector ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} gap-10`}>
+              
+              {/* 🛡️ RESTRICCIÓN: Solo visible para el Director */}
+              {esDirector && (
+                <div className="p-8 bg-blue-50/30 rounded-3xl border border-blue-100 space-y-4">
+                  <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+                    <Receipt size={14}/> Cobertura y Facturación
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <select className="w-full p-4 bg-white rounded-2xl font-bold text-sm border-none shadow-sm" value={form.obra_social} onChange={e => setForm({...form, obra_social: e.target.value})}>
+                      {OBRAS_SOCIALES.map(os => <option key={os} value={os}>{os}</option>)}
+                    </select>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-red-500 uppercase ml-2">Venc. CUD</label>
+                        <input type="date" value={form.fecha_vencimiento_cud} className="w-full p-4 bg-white rounded-2xl font-bold text-sm border border-red-100 text-gray-500" onChange={e => setForm({...form, fecha_vencimiento_cud: e.target.value})} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-green-600 uppercase ml-2 font-mono">Cuota Mensual ($)</label>
+                        <input 
+                          type="number" 
+                          step="0.01" 
+                          value={form.monto_cuota}
+                          placeholder="0.00" 
+                          className="w-full p-4 bg-white rounded-2xl font-black text-sm border-2 border-green-100 text-green-700 outline-none" 
+                          onChange={e => setForm({...form, monto_cuota: e.target.value})} 
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-black text-green-600 uppercase ml-2 font-mono">Cuota Mensual ($)</label>
-                      <input 
-                        type="number" 
-                        step="0.01" 
-                        value={form.monto_cuota}
-                        placeholder="0.00" 
-                        className="w-full p-4 bg-white rounded-2xl font-black text-sm border-2 border-green-100 text-green-700 outline-none" 
-                        onChange={e => setForm({...form, monto_cuota: e.target.value})} 
-                      />
-                    </div>
+                    <select className="w-full p-4 bg-white rounded-2xl font-black text-[10px] text-blue-600 border border-blue-200 uppercase" value={form.tipo_factura} onChange={e => setForm({...form, tipo_factura: e.target.value})}>
+                      <option value="B">Factura B (Consumidor Final)</option>
+                      <option value="A">Factura A (Resp. Inscripto)</option>
+                      <option value="M">Factura M</option>
+                      <option value="T">Factura T (Especial)</option>
+                    </select>
                   </div>
-                  <select className="w-full p-4 bg-white rounded-2xl font-black text-[10px] text-blue-600 border border-blue-200 uppercase" value={form.tipo_factura} onChange={e => setForm({...form, tipo_factura: e.target.value})}>
-                    <option value="B">Factura B (Consumidor Final)</option>
-                    <option value="A">Factura A (Resp. Inscripto)</option>
-                    <option value="M">Factura M</option>
-                    <option value="T">Factura T (Especial)</option>
-                  </select>
                 </div>
-              </div>
+              )}
 
               <div className="space-y-4">
                 <h3 className="text-[10px] font-black text-red-500 uppercase tracking-widest flex items-center gap-2">
                   <Activity size={14}/> Resumen Clínico
                 </h3>
-                <textarea value={form.patologia} placeholder="Patología" rows="3" className="w-full p-4 bg-red-50/20 border border-red-50 rounded-2xl font-bold text-sm outline-none" onChange={e => setForm({...form, patologia: e.target.value})} />
-                <textarea value={form.medicacion} placeholder="Medicación" rows="3" className="w-full p-4 bg-blue-50/20 border border-blue-50 rounded-2xl font-bold text-sm outline-none" onChange={e => setForm({...form, medicacion: e.target.value})} />
+                <div className={`grid grid-cols-1 ${!esDirector ? 'md:grid-cols-2' : ''} gap-4`}>
+                  <textarea value={form.patologia} placeholder="Patología" rows="3" className="w-full p-4 bg-red-50/20 border border-red-50 rounded-2xl font-bold text-sm outline-none" onChange={e => setForm({...form, patologia: e.target.value})} />
+                  <textarea value={form.medicacion} placeholder="Medicación" rows="3" className="w-full p-4 bg-blue-50/20 border border-blue-50 rounded-2xl font-bold text-sm outline-none" onChange={e => setForm({...form, medicacion: e.target.value})} />
+                </div>
               </div>
             </div>
 
             <button disabled={updating} className="w-full bg-[#1a3a5f] text-white p-7 rounded-3xl font-black uppercase tracking-[0.3em] shadow-xl hover:bg-[#84bd00] transition-all flex items-center justify-center gap-3 disabled:opacity-50">
               {updating ? <Loader2 className="animate-spin" /> : <Save size={22}/>}
-              {updating ? "GUARDANDO CAMBIOS..." : "ACTUALIZAR LEGAJO v3.1"}
+              {updating ? "GUARDANDO CAMBIOS..." : "ACTUALIZAR LEGAJO v3.4"}
             </button>
           </div>
         </form>

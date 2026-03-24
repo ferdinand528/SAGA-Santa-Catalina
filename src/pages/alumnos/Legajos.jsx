@@ -33,18 +33,19 @@ const Legajos = () => {
     cargarDatos();
   }, []);
 
-  // Lógica de permisos mejorada (insensible a mayúsculas)
+  // 🛡️ DEFINICIÓN DE ROLES ACTUALIZADA v3.4
   const rolUsuario = perfil?.rol?.toLowerCase();
-  const esGestion = rolUsuario === 'director' || rolUsuario === 'administrador' || rolUsuario === 'admin';
+  const esDirector = rolUsuario === 'director'; // Único con permiso de borrado
+  const esGestion = ['director', 'administrador', 'coordinacion'].includes(rolUsuario); // Permiso de Alta y Edición
 
   const borrarAlumno = async (id, nombre) => {
-    // 🛡️ PROTECCIÓN EXTRA: Verificación de rol antes de ejecutar la acción
-    if (!esGestion) {
-      alert("Acceso denegado: Su rol de Docente no permite eliminar legajos.");
+    // 🛡️ PROTECCIÓN DE NIVEL DIRECCIÓN
+    if (!esDirector) {
+      alert("Acceso denegado: Solo la Dirección tiene permisos para eliminar legajos definitivos.");
       return;
     }
 
-    const confirmar = window.confirm(`¿Está seguro de eliminar el legajo de ${nombre}? Esta acción es irreversible.`);
+    const confirmar = window.confirm(`¿Está seguro de eliminar el legajo de ${nombre}? Esta acción es irreversible y borrará toda la documentación asociada.`);
     if (!confirmar) return;
 
     try {
@@ -63,12 +64,11 @@ const Legajos = () => {
 
   if (loading) return (
     <div className="h-screen flex items-center justify-center font-black text-[#84bd00] animate-pulse bg-transparent">
-      SINCRONIZANDO NÓMINA v3.1...
+      SINCRONIZANDO NÓMINA v3.4...
     </div>
   );
 
   return (
-    /* 🖼️ bg-transparent para mostrar el logo de App.jsx */
     <div className="min-h-screen p-6 md:p-12 bg-transparent animate-fade-in font-sans">
       <div className="max-w-7xl mx-auto">
         
@@ -81,11 +81,11 @@ const Legajos = () => {
               Legajos <span className="text-[#84bd00]">Alumnos</span>
             </h1>
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2 italic border-l-4 border-[#84bd00] pl-3">
-              {esGestion ? 'Gestión Directiva • Santa Catalina v3.1' : 'Registro Pedagógico • Área Docente'}
+              {esDirector ? 'Modo Súper Usuario (Dirección)' : 'Gestión de Legajos • Santa Catalina'}
             </p>
           </div>
 
-          {/* 🛡️ SOLO GESTIÓN: Botón Nuevo Legajo */}
+          {/* 🛡️ PERMISO DE ALTA: Director, Admin y Coordinación */}
           {esGestion && (
             <button 
               onClick={() => navigate('/alta-alumno')}
@@ -96,7 +96,6 @@ const Legajos = () => {
           )}
         </header>
 
-        {/* BUSCADOR CON TRANSPARENCIA */}
         <div className="relative mb-12">
           <Search className="absolute left-8 top-1/2 -translate-y-1/2 text-gray-300" size={24} />
           <input 
@@ -108,7 +107,6 @@ const Legajos = () => {
           />
         </div>
 
-        {/* GRILLA DE TARJETAS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filtrados.map(a => (
             <div key={a.id} className="bg-white/80 backdrop-blur-md p-8 rounded-[3rem] shadow-sm border border-white relative group hover:shadow-xl transition-all">
@@ -134,7 +132,7 @@ const Legajos = () => {
                   Ver Ficha <ArrowRight size={16}/>
                 </button>
 
-                {/* 🛡️ SOLO GESTIÓN: Botones Editar y Borrar */}
+                {/* 🛡️ SECCIÓN DE ACCIONES PROTEGIDAS */}
                 {esGestion && (
                   <div className="flex gap-2">
                     <button 
@@ -144,13 +142,17 @@ const Legajos = () => {
                     >
                       <Edit size={18} />
                     </button>
-                    <button 
-                      onClick={() => borrarAlumno(a.id, `${a.apellido}, ${a.nombre}`)}
-                      className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                      title="Eliminar Legajo"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+
+                    {/* 🛡️ RESTRICCIÓN FINAL: Solo Director ve la papelera */}
+                    {esDirector && (
+                      <button 
+                        onClick={() => borrarAlumno(a.id, `${a.apellido}, ${a.nombre}`)}
+                        className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                        title="Eliminar Legajo (Solo Dirección)"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
